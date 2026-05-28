@@ -3,14 +3,13 @@ import {Alert, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View} 
 import {Provider} from 'react-redux';
 import {PersistGate} from 'redux-persist/integration/react';
 import {SafeAreaProvider, SafeAreaView} from 'react-native-safe-area-context';
-import CategoryTotalsCard from './src/components/CategoryTotalsCard';
 import ExpenseFormCard from './src/components/ExpenseFormCard';
 import ExpensesTableCard from './src/components/ExpensesTableCard';
 import MoneySummaryCard from './src/components/MoneySummaryCard';
 import MonthsListCard from './src/components/MonthsListCard';
 import PageHeader from './src/components/PageHeader';
 import PieChartCard from './src/components/PieChartCard';
-import {CHART_COLORS} from './src/constants/appConstants';
+import {getCategoryColor} from './src/constants/appConstants';
 import {PieDatum} from './src/types/expense';
 import {currentMonthKey, formatMonthLabel, toMonthKey} from './src/utils/date';
 import {useAppDispatch, useAppSelector} from './src/store/hooks';
@@ -113,10 +112,10 @@ function AppContent(): React.JSX.Element {
   }, [selectedMonthExpenses]);
 
   const toPieData = (totals: Record<string, number>): PieDatum[] =>
-    Object.entries(totals).map(([category, total], index) => ({
+    Object.entries(totals).map(([category, total]) => ({
       name: category,
       population: total,
-      color: CHART_COLORS[index % CHART_COLORS.length],
+      color: getCategoryColor(category),
     }));
 
   const pieDataAll = useMemo(() => toPieData(totalsByCategoryAll), [totalsByCategoryAll]);
@@ -188,10 +187,6 @@ function AppContent(): React.JSX.Element {
         onEdit={expense => dispatch(startEditingExpense(expense))}
         onDelete={expenseId => dispatch(deleteExpense(expenseId))}
       />
-
-      <CategoryTotalsCard
-        totals={totalsByCategoryAll}
-      />
       <PieChartCard data={pieDataAll} />
     </>
   );
@@ -222,10 +217,6 @@ function AppContent(): React.JSX.Element {
         items={selectedMonthExpenses}
         onEdit={expense => dispatch(startEditingExpense(expense))}
         onDelete={expenseId => dispatch(deleteExpense(expenseId))}
-      />
-
-      <CategoryTotalsCard
-        totals={totalsByCategorySelectedMonth}
       />
       <PieChartCard data={pieDataSelectedMonth} />
     </>
