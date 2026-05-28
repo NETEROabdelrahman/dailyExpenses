@@ -32,7 +32,7 @@ function MonthsListCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fef2f2',
     borderRadius: 14,
     padding: 14,
     gap: 8,

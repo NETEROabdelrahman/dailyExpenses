@@ -20,24 +20,29 @@ function MoneySummaryCard({
 }: MoneySummaryCardProps): React.JSX.Element {
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>الأموال المتاحة</Text>
-      <Text style={styles.label}>النقد المتوفر</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="0"
-        keyboardType="numeric"
-        value={cashText}
-        onChangeText={onCashChange}
-      />
+      <View style={styles.compactFieldsRow}>
+        <View style={styles.compactField}>
+          <Text style={styles.label}>النقد المتوفر</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={cashText}
+            onChangeText={onCashChange}
+          />
+        </View>
 
-      <Text style={styles.label}>رصيد البنك</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="0"
-        keyboardType="numeric"
-        value={bankText}
-        onChangeText={onBankChange}
-      />
+        <View style={styles.compactField}>
+          <Text style={styles.label}>رصيد البنك</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={bankText}
+            onChangeText={onBankChange}
+          />
+        </View>
+      </View>
 
       <View style={styles.moneySummaryRow}>
         <Text style={styles.moneySummaryValue}>{totalCashAndBank.toFixed(2)} ج.م</Text>
@@ -59,7 +64,7 @@ function MoneySummaryCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#ecfdf5',
     borderRadius: 14,
     padding: 14,
     gap: 8,
@@ -89,6 +94,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: '#0f172a',
+  },
+  compactFieldsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  compactField: {
+    flex: 1,
   },
   moneySummaryRow: {
     flexDirection: 'row-reverse',

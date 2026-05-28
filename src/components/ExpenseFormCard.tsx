@@ -46,34 +46,6 @@ function ExpenseFormCard({
   onCancelEdit,
 }: ExpenseFormCardProps): React.JSX.Element {
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const keypadRows = [
-    ['7', '8', '9'],
-    ['4', '5', '6'],
-    ['1', '2', '3'],
-    ['.', '0', '←'],
-  ];
-
-  const applyAmountKey = (key: string) => {
-    if (key === '←') {
-      onAmountChange(amountText.slice(0, -1));
-      return;
-    }
-
-    if (key === '.') {
-      if (amountText.includes('.')) {
-        return;
-      }
-      onAmountChange(amountText ? `${amountText}.` : '0.');
-      return;
-    }
-
-    const next = `${amountText}${key}`;
-    if (!/^\d*(\.\d{0,2})?$/.test(next)) {
-      return;
-    }
-
-    onAmountChange(next);
-  };
 
   const sanitizeAmountInput = (value: string) => {
     const cleaned = value.replace(/[^0-9.]/g, '');
@@ -100,46 +72,63 @@ function ExpenseFormCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.label}>اسم المصروف</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="مثال: وجبة غداء"
-        value={name}
-        onChangeText={onNameChange}
-      />
+      <View style={styles.compactFieldsRow}>
+        <View style={styles.compactField}>
+          <Text style={styles.label}>اسم المصروف</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="مثال: وجبة غداء"
+            value={name}
+            onChangeText={onNameChange}
+          />
+        </View>
 
-      <Text style={styles.label}>السعر</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="0"
-        keyboardType="numeric"
-        value={amountText}
-        onChangeText={sanitizeAmountInput}
-      />
-      <View style={styles.keypadCard}>
-        {keypadRows.map((row, rowIndex) => (
-          <View key={`row-${rowIndex}`} style={styles.keypadRow}>
-            {row.map(key => (
-              <TouchableOpacity
-                key={key}
-                style={[styles.keypadBtn, key === '←' ? styles.keypadBackspace : null]}
-                onPress={() => applyAmountKey(key)}>
-                <Text style={styles.keypadBtnText}>{key}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-        <TouchableOpacity style={styles.keypadClearBtn} onPress={() => onAmountChange('')}>
-          <Text style={styles.btnText}>مسح</Text>
-        </TouchableOpacity>
+        <View style={styles.compactField}>
+          <Text style={styles.label}>ملاحظات</Text>
+          <TextInput
+            style={[styles.input, styles.compactNotesInput]}
+            placeholder="أي ملاحظة"
+            value={notes}
+            onChangeText={onNotesChange}
+          />
+        </View>
       </View>
 
-      <Text style={styles.label}>التاريخ</Text>
-      <TouchableOpacity
-        style={styles.datePickerBtn}
-        onPress={() => setShowDatePicker(true)}>
-        <Text style={styles.datePickerBtnText}>{formatDate(expenseDate.toISOString())}</Text>
-      </TouchableOpacity>
+      <View style={styles.compactFieldsRow}>
+        <View style={styles.compactField}>
+          <Text style={styles.label}>السعر</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={amountText}
+            onChangeText={sanitizeAmountInput}
+          />
+        </View>
+
+        <View style={styles.compactField}>
+          <Text style={styles.label}>التاريخ</Text>
+          <TouchableOpacity
+            style={styles.datePickerBtn}
+            onPress={() => setShowDatePicker(true)}>
+            <Text style={styles.datePickerBtnText}>{formatDate(expenseDate.toISOString())}</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.compactField}>
+          <Text style={styles.label}>الفئة</Text>
+          <View style={styles.pickerWrap}>
+            <Picker
+              style={styles.compactPicker}
+              selectedValue={selectedCategory}
+              onValueChange={itemValue => onSelectedCategoryChange(String(itemValue))}>
+              {categories.map(cat => (
+                <Picker.Item key={cat} label={cat} value={cat} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      </View>
       {showDatePicker ? (
         <DateTimePicker
           value={expenseDate}
@@ -148,17 +137,6 @@ function ExpenseFormCard({
           onChange={onChangeExpenseDate}
         />
       ) : null}
-
-      <Text style={styles.label}>الفئة (Category)</Text>
-      <View style={styles.pickerWrap}>
-        <Picker
-          selectedValue={selectedCategory}
-          onValueChange={itemValue => onSelectedCategoryChange(String(itemValue))}>
-          {categories.map(cat => (
-            <Picker.Item key={cat} label={cat} value={cat} />
-          ))}
-        </Picker>
-      </View>
 
       <View style={styles.inlineRow}>
         <TextInput
@@ -171,15 +149,6 @@ function ExpenseFormCard({
           <Text style={styles.btnText}>إضافة فئة</Text>
         </TouchableOpacity>
       </View>
-
-      <Text style={styles.label}>ملاحظات</Text>
-      <TextInput
-        style={[styles.input, styles.notesInput]}
-        placeholder="أي ملاحظة"
-        value={notes}
-        onChangeText={onNotesChange}
-        multiline
-      />
 
       <TouchableOpacity style={styles.primaryBtn} onPress={onSubmit}>
         <Text style={styles.btnText}>{editing ? 'تحديث المصروف' : 'إضافة المصروف'}</Text>
@@ -194,8 +163,11 @@ function ExpenseFormCard({
 }
 
 const styles = StyleSheet.create({
+  compactControl: {
+    height: 48,
+  },
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fff4e8',
     borderRadius: 14,
     padding: 14,
     gap: 8,
@@ -218,6 +190,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: '#0f172a',
+    height: 48,
   },
   datePickerBtn: {
     backgroundColor: '#f1f5f9',
@@ -225,7 +198,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#dbeafe',
     paddingHorizontal: 12,
-    paddingVertical: 12,
+    height: 48,
+    justifyContent: 'center',
   },
   datePickerBtnText: {
     color: '#0f172a',
@@ -238,52 +212,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#dbeafe',
     overflow: 'hidden',
+    height: 48,
+    justifyContent: 'center',
+  },
+  compactPicker: {
+    height: 48,
   },
   inlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  compactFieldsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  compactField: {
+    flex: 1,
+  },
   flexInput: {
     flex: 1,
-  },
-  keypadCard: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 10,
-    padding: 8,
-    gap: 6,
-  },
-  keypadRow: {
-    flexDirection: 'row-reverse',
-    gap: 6,
-  },
-  keypadBtn: {
-    flex: 1,
-    backgroundColor: '#dbeafe',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  keypadBackspace: {
-    backgroundColor: '#bfdbfe',
-  },
-  keypadBtnText: {
-    color: '#0f172a',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  keypadClearBtn: {
-    marginTop: 2,
-    backgroundColor: '#64748b',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
   },
   notesInput: {
     minHeight: 62,
     textAlignVertical: 'top',
+  },
+  compactNotesInput: {
+    height: 48,
   },
   primaryBtn: {
     marginTop: 6,

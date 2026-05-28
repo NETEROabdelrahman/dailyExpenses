@@ -63,7 +63,6 @@ const mockState = {
   app: {
     expenses: [],
     categories: ['طعام', 'ديون', 'مواصلات', 'تسوق', 'أخرى'],
-    categoryLimits: {},
     cashText: '',
     bankText: '',
     page: 'main',
@@ -95,10 +94,6 @@ jest.mock('../src/store/appSlice', () => ({
   setAmountText: (payload: string) => ({type: 'app/setAmountText', payload}),
   setBankText: (payload: string) => ({type: 'app/setBankText', payload}),
   setCashText: (payload: string) => ({type: 'app/setCashText', payload}),
-  setCategoryLimit: (payload: {category: string; limitText: string}) => ({
-    type: 'app/setCategoryLimit',
-    payload,
-  }),
   setExpenseDateISO: (payload: string) => ({type: 'app/setExpenseDateISO', payload}),
   setName: (payload: string) => ({type: 'app/setName', payload}),
   setNewCategory: (payload: string) => ({type: 'app/setNewCategory', payload}),

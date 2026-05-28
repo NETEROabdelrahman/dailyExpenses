@@ -14,7 +14,6 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
 
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>توزيع المصاريف (Pie Chart)</Text>
       {data.length > 0 ? (
         <>
           <View style={styles.pieCanvasWrap}>
@@ -94,7 +93,7 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f3ff',
     borderRadius: 14,
     padding: 14,
     gap: 8,
@@ -103,13 +102,6 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 4},
     shadowRadius: 10,
     elevation: 2,
-  },
-  sectionTitle: {
-    color: '#0f172a',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'right',
-    marginBottom: 8,
   },
   pieCanvasWrap: {
     width: PIE_CHART_SIZE,

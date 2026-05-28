@@ -6,7 +6,6 @@ import {normalizedDateISO} from '../utils/date';
 type AppState = {
   expenses: Expense[];
   categories: string[];
-  categoryLimits: Record<string, number>;
   cashText: string;
   bankText: string;
   page: AppPage;
@@ -25,7 +24,6 @@ type AppState = {
 const createInitialState = (): AppState => ({
   expenses: [],
   categories: DEFAULT_CATEGORIES,
-  categoryLimits: {},
   cashText: '',
   bankText: '',
   page: 'main',
@@ -74,25 +72,6 @@ const appSlice = createSlice({
     },
     setCashText(state, action: PayloadAction<string>) {
       state.cashText = action.payload;
-    },
-    setCategoryLimit(
-      state,
-      action: PayloadAction<{category: string; limitText: string}>,
-    ) {
-      const {category, limitText} = action.payload;
-      const clean = limitText.trim();
-
-      if (!clean) {
-        delete state.categoryLimits[category];
-        return;
-      }
-
-      const parsed = Number(clean);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        return;
-      }
-
-      state.categoryLimits[category] = parsed;
     },
     setBankText(state, action: PayloadAction<string>) {
       state.bankText = action.payload;
@@ -190,7 +169,6 @@ export const {
   setAmountText,
   setBankText,
   setCashText,
-  setCategoryLimit,
   setExpenseDateISO,
   setName,
   setNewCategory,

@@ -1,9 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
 import {
+  createMigrate,
   FLUSH,
+  MigrationManifest,
   PAUSE,
   PERSIST,
+  PersistConfig,
+  PersistedState,
   persistReducer,
   persistStore,
   PURGE,
@@ -16,10 +20,37 @@ const rootReducer = combineReducers({
   app: appReducer,
 });
 
-const persistConfig = {
+type PersistedRootState = ReturnType<typeof rootReducer> & {
+  app?: ReturnType<typeof appReducer> & {
+    categoryLimits?: unknown;
+  };
+};
+
+const migrations: MigrationManifest = {
+  1: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+    delete nextApp.categoryLimits;
+    nextState.app = nextApp;
+    return nextState;
+  },
+};
+
+const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: 'root',
+  version: 1,
   storage: AsyncStorage,
   whitelist: ['app'],
+  migrate: createMigrate(migrations, {debug: false}),
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

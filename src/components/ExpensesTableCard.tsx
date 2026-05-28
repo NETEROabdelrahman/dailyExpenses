@@ -8,14 +8,12 @@ const TABLE_ROW_ESTIMATED_HEIGHT = 44;
 
 type ExpensesTableCardProps = {
   items: Expense[];
-  title?: string;
   onEdit: (item: Expense) => void;
   onDelete: (expenseId: string) => void;
 };
 
 function ExpensesTableCard({
   items,
-  title = 'الجدول',
   onEdit,
   onDelete,
 }: ExpensesTableCardProps): React.JSX.Element {
@@ -32,17 +30,8 @@ function ExpensesTableCard({
 
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>{title}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View>
-          <View style={[styles.tableRow, styles.tableHeader]}>
-            <Text style={[styles.cell, styles.headerCell]}>الاسم</Text>
-            <Text style={[styles.cell, styles.headerCell]}>السعر</Text>
-            <Text style={[styles.cell, styles.headerCell]}>التاريخ</Text>
-            <Text style={[styles.cell, styles.headerCell]}>الفئة</Text>
-            <Text style={[styles.cell, styles.headerCell]}>ملاحظات</Text>
-            <Text style={[styles.cell, styles.headerCell]}>إجراءات</Text>
-          </View>
           {items.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>لا توجد مصاريف</Text>
@@ -105,7 +94,7 @@ function ExpensesTableCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#eff6ff',
     borderRadius: 14,
     padding: 14,
     gap: 8,
@@ -114,16 +103,6 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 4},
     shadowRadius: 10,
     elevation: 2,
-  },
-  sectionTitle: {
-    color: '#0f172a',
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'right',
-    marginBottom: 8,
-  },
-  tableHeader: {
-    backgroundColor: '#e2e8f0',
   },
   tableRow: {
     flexDirection: 'row-reverse',
@@ -140,10 +119,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     color: '#334155',
     textAlign: 'right',
-  },
-  headerCell: {
-    fontWeight: '700',
-    color: '#0f172a',
   },
   actionsCell: {
     flexDirection: 'row-reverse',

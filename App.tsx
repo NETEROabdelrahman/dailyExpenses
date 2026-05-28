@@ -23,7 +23,6 @@ import {
   setAmountText,
   setBankText,
   setCashText,
-  setCategoryLimit,
   setExpenseDateISO,
   setName,
   setNewCategory,
@@ -39,7 +38,6 @@ function AppContent(): React.JSX.Element {
   const {
     expenses,
     categories,
-    categoryLimits,
     cashText,
     bankText,
     page,
@@ -193,10 +191,6 @@ function AppContent(): React.JSX.Element {
 
       <CategoryTotalsCard
         totals={totalsByCategoryAll}
-        categoryLimits={categoryLimits}
-        onLimitChange={(category, limitText) =>
-          dispatch(setCategoryLimit({category, limitText}))
-        }
       />
       <PieChartCard data={pieDataAll} />
     </>
@@ -232,10 +226,6 @@ function AppContent(): React.JSX.Element {
 
       <CategoryTotalsCard
         totals={totalsByCategorySelectedMonth}
-        categoryLimits={categoryLimits}
-        onLimitChange={(category, limitText) =>
-          dispatch(setCategoryLimit({category, limitText}))
-        }
       />
       <PieChartCard data={pieDataSelectedMonth} />
     </>
@@ -282,7 +272,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   totalCard: {
-    backgroundColor: '#0f766e',
+    backgroundColor: '#e0f2fe',
     borderRadius: 14,
     padding: 14,
     gap: 6,
@@ -294,12 +284,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   totalLabel: {
-    color: '#ccfbf1',
+    color: '#0f4c81',
     fontSize: 14,
     textAlign: 'right',
   },
   totalValue: {
-    color: '#ffffff',
+    color: '#0c4a6e',
     fontSize: 30,
     fontWeight: '700',
     textAlign: 'right',
