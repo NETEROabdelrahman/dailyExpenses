@@ -1,6 +1,10 @@
 import React, {useMemo, useRef, useState} from 'react';
 import {Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {getCategoryColor, getCategoryTint} from '../constants/appConstants';
+import {
+  getCategoryColor,
+  getCategoryTint,
+  PAYMENT_METHOD_LABELS,
+} from '../constants/appConstants';
 import {Expense} from '../types/expense';
 import {formatDate} from '../utils/date';
 
@@ -13,7 +17,7 @@ type ExpensesTableCardProps = {
   onDelete: (expenseId: string) => void;
 };
 
-type SortKey = 'name' | 'amount' | 'dateISO' | 'category' | 'notes';
+type SortKey = 'name' | 'amount' | 'dateISO' | 'category' | 'paymentMethod' | 'notes';
 type SortDirection = 'asc' | 'desc';
 
 function ExpensesTableCard({
@@ -38,6 +42,11 @@ function ExpensesTableCard({
           return new Date(first.dateISO).getTime() - new Date(second.dateISO).getTime();
         case 'category':
           return first.category.localeCompare(second.category, 'ar');
+        case 'paymentMethod':
+          return PAYMENT_METHOD_LABELS[first.paymentMethod].localeCompare(
+            PAYMENT_METHOD_LABELS[second.paymentMethod],
+            'ar',
+          );
         case 'notes':
           return (first.notes || '').localeCompare(second.notes || '', 'ar');
         case 'name':
@@ -91,6 +100,7 @@ function ExpensesTableCard({
         <Text style={[styles.cell, styles.categoryCell, {color: categoryColor}]}>
           {item.category}
         </Text>
+        <Text style={styles.cell}>{PAYMENT_METHOD_LABELS[item.paymentMethod]}</Text>
         <Text style={styles.cell}>{item.notes || '-'}</Text>
         <View style={[styles.cell, styles.actionsCell]}>
           <TouchableOpacity
@@ -144,6 +154,11 @@ function ExpensesTableCard({
                 style={[styles.headerSortCell, styles.cell]}
                 onPress={() => toggleSort('category')}>
                 <Text style={styles.headerSortText}>الفئة {getSortArrow('category')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.headerSortCell, styles.cell]}
+                onPress={() => toggleSort('paymentMethod')}>
+                <Text style={styles.headerSortText}>طريقة الدفع {getSortArrow('paymentMethod')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.headerSortCell, styles.cell]}

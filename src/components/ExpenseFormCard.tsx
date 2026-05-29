@@ -4,6 +4,8 @@ import {Picker} from '@react-native-picker/picker';
 import DateTimePicker, {
   DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
+import {PAYMENT_METHOD_LABELS, PAYMENT_METHODS} from '../constants/appConstants';
+import {PaymentMethod} from '../types/expense';
 import {formatDate} from '../utils/date';
 
 type ExpenseFormCardProps = {
@@ -12,6 +14,7 @@ type ExpenseFormCardProps = {
   expenseDate: Date;
   notes: string;
   selectedCategory: string;
+  selectedPaymentMethod: PaymentMethod;
   newCategory: string;
   categories: string[];
   editing: boolean;
@@ -20,6 +23,7 @@ type ExpenseFormCardProps = {
   onDateChange: (value: Date) => void;
   onNotesChange: (value: string) => void;
   onSelectedCategoryChange: (value: string) => void;
+  onSelectedPaymentMethodChange: (value: PaymentMethod) => void;
   onNewCategoryChange: (value: string) => void;
   onAddCategory: () => void;
   onSubmit: () => void;
@@ -32,6 +36,7 @@ function ExpenseFormCard({
   expenseDate,
   notes,
   selectedCategory,
+  selectedPaymentMethod,
   newCategory,
   categories,
   editing,
@@ -40,6 +45,7 @@ function ExpenseFormCard({
   onDateChange,
   onNotesChange,
   onSelectedCategoryChange,
+  onSelectedPaymentMethodChange,
   onNewCategoryChange,
   onAddCategory,
   onSubmit,
@@ -124,6 +130,28 @@ function ExpenseFormCard({
               onValueChange={itemValue => onSelectedCategoryChange(String(itemValue))}>
               {categories.map(cat => (
                 <Picker.Item key={cat} label={cat} value={cat} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.compactFieldsRow}>
+        <View style={styles.compactField}>
+          <Text style={styles.label}>طريقة الدفع</Text>
+          <View style={styles.pickerWrap}>
+            <Picker
+              style={styles.compactPicker}
+              selectedValue={selectedPaymentMethod}
+              onValueChange={itemValue =>
+                onSelectedPaymentMethodChange(itemValue as PaymentMethod)
+              }>
+              {PAYMENT_METHODS.map(method => (
+                <Picker.Item
+                  key={method}
+                  label={PAYMENT_METHOD_LABELS[method]}
+                  value={method}
+                />
               ))}
             </Picker>
           </View>

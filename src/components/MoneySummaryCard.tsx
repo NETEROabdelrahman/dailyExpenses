@@ -2,24 +2,36 @@ import React from 'react';
 import {StyleSheet, Text, TextInput, View} from 'react-native';
 
 type MoneySummaryCardProps = {
-  cashText: string;
-  bankText: string;
-  totalCashAndBank: number;
-  remainingBalance: number;
-  onCashChange: (value: string) => void;
-  onBankChange: (value: string) => void;
+  initialCashText: string;
+  initialBankText: string;
+  initialWalletText: string;
+  remainingCash: number;
+  remainingBank: number;
+  remainingWallet: number;
+  totalBefore: number;
+  totalAfter: number;
+  onInitialCashChange: (value: string) => void;
+  onInitialBankChange: (value: string) => void;
+  onInitialWalletChange: (value: string) => void;
 };
 
 function MoneySummaryCard({
-  cashText,
-  bankText,
-  totalCashAndBank,
-  remainingBalance,
-  onCashChange,
-  onBankChange,
+  initialCashText,
+  initialBankText,
+  initialWalletText,
+  remainingCash,
+  remainingBank,
+  remainingWallet,
+  totalBefore,
+  totalAfter,
+  onInitialCashChange,
+  onInitialBankChange,
+  onInitialWalletChange,
 }: MoneySummaryCardProps): React.JSX.Element {
   return (
     <View style={styles.card}>
+      <Text style={styles.sectionTitle}>الأرصدة الابتدائية</Text>
+
       <View style={styles.compactFieldsRow}>
         <View style={styles.compactField}>
           <Text style={styles.label}>النقد المتوفر</Text>
@@ -27,8 +39,8 @@ function MoneySummaryCard({
             style={styles.input}
             placeholder="0"
             keyboardType="numeric"
-            value={cashText}
-            onChangeText={onCashChange}
+            value={initialCashText}
+            onChangeText={onInitialCashChange}
           />
         </View>
 
@@ -38,25 +50,54 @@ function MoneySummaryCard({
             style={styles.input}
             placeholder="0"
             keyboardType="numeric"
-            value={bankText}
-            onChangeText={onBankChange}
+            value={initialBankText}
+            onChangeText={onInitialBankChange}
+          />
+        </View>
+
+        <View style={styles.compactField}>
+          <Text style={styles.label}>رصيد المحفظة</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0"
+            keyboardType="numeric"
+            value={initialWalletText}
+            onChangeText={onInitialWalletChange}
           />
         </View>
       </View>
 
+      <Text style={styles.sectionTitle}>الرصيد المتبقي لكل وسيلة</Text>
+
       <View style={styles.moneySummaryRow}>
-        <Text style={styles.moneySummaryValue}>{totalCashAndBank.toFixed(2)} ج.م</Text>
-        <Text style={styles.moneySummaryLabel}>إجمالي النقد + البنك</Text>
+        <Text style={styles.moneySummaryValue}>{remainingCash.toFixed(2)} ج.م</Text>
+        <Text style={styles.moneySummaryLabel}>النقد المتوفر</Text>
       </View>
+
+      <View style={styles.moneySummaryRow}>
+        <Text style={styles.moneySummaryValue}>{remainingBank.toFixed(2)} ج.م</Text>
+        <Text style={styles.moneySummaryLabel}>رصيد البنك</Text>
+      </View>
+
+      <View style={styles.moneySummaryRow}>
+        <Text style={styles.moneySummaryValue}>{remainingWallet.toFixed(2)} ج.م</Text>
+        <Text style={styles.moneySummaryLabel}>رصيد المحفظة</Text>
+      </View>
+
+      <View style={styles.moneySummaryRow}>
+        <Text style={styles.moneySummaryValue}>{totalBefore.toFixed(2)} ج.م</Text>
+        <Text style={styles.moneySummaryLabel}>الإجمالي قبل الحركة</Text>
+      </View>
+
       <View style={styles.moneySummaryRow}>
         <Text
           style={[
             styles.moneySummaryValue,
-            remainingBalance < 0 ? styles.negativeValue : null,
+            totalAfter < 0 ? styles.negativeValue : null,
           ]}>
-          {remainingBalance.toFixed(2)} ج.م
+          {totalAfter.toFixed(2)} ج.م
         </Text>
-        <Text style={styles.moneySummaryLabel}>المتبقي بعد المصاريف</Text>
+        <Text style={styles.moneySummaryLabel}>الإجمالي بعد الحركة</Text>
       </View>
     </View>
   );

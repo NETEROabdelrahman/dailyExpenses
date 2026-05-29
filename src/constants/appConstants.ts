@@ -1,6 +1,26 @@
 import {Dimensions} from 'react-native';
+import {DebtDirection, DebtStatus, PaymentMethod} from '../types/expense';
 
 export const DEFAULT_CATEGORIES = ['طعام', 'ديون', 'مواصلات', 'تسوق', 'أخرى'];
+
+export const PAYMENT_METHODS: PaymentMethod[] = ['cash', 'bank', 'wallet'];
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: 'النقد المتوفر',
+  bank: 'رصيد البنك',
+  wallet: 'رصيد المحفظة',
+};
+
+export const DEBT_DIRECTION_LABELS: Record<DebtDirection, string> = {
+  owe: 'عليّ',
+  owedToMe: 'لي',
+};
+
+export const DEBT_STATUS_LABELS: Record<DebtStatus, string> = {
+  active: 'نشط',
+  settled: 'مسدد',
+  overdue: 'متأخر',
+};
 
 export const CHART_COLORS = [
   '#f97316',
