@@ -7,6 +7,8 @@ import {
   DebtStatus,
   DebtTransaction,
   Expense,
+  IncomingMoneySourceType,
+  IncomingMoneyTransaction,
   PaymentMethod,
 } from '../types/expense';
 import {normalizedDateISO} from '../utils/date';
@@ -14,6 +16,8 @@ import {normalizedDateISO} from '../utils/date';
 type AppState = {
   expenses: Expense[];
   debts: Debt[];
+  incomingTransactions: IncomingMoneyTransaction[];
+  customIncomingSources: string[];
   categories: string[];
   initialCashText: string;
   initialBankText: string;
@@ -46,10 +50,17 @@ type AppState = {
     paymentMethod: PaymentMethod;
     transactionDateISO: string;
   };
+  incomingForm: {
+    amountText: string;
+    paymentMethod: PaymentMethod;
+    sourceType: IncomingMoneySourceType;
+    sourceOtherText: string;
+  };
 };
 
 const DEFAULT_PAYMENT_METHOD: PaymentMethod = 'cash';
 const DEFAULT_DEBT_DIRECTION: DebtDirection = 'owe';
+const DEFAULT_INCOMING_SOURCE: IncomingMoneySourceType = 'salary';
 
 const toNumber = (value: string): number => {
   const parsed = Number(value);
@@ -70,6 +81,22 @@ const normalizeDebtDirection = (direction?: DebtDirection): DebtDirection => {
     return direction;
   }
   return DEFAULT_DEBT_DIRECTION;
+};
+
+const normalizeIncomingSourceType = (
+  sourceType?: IncomingMoneySourceType,
+): IncomingMoneySourceType => {
+  if (
+    sourceType === 'salary' ||
+    sourceType === 'freelance' ||
+    sourceType === 'gift' ||
+    sourceType === 'refund' ||
+    sourceType === 'other'
+  ) {
+    return sourceType;
+  }
+
+  return DEFAULT_INCOMING_SOURCE;
 };
 
 const computeDebtStatus = (dueDateISO: string, remainingAmount: number): DebtStatus => {
@@ -123,6 +150,8 @@ const adjustBalance = (state: AppState, paymentMethod: PaymentMethod, delta: num
 const createInitialState = (): AppState => ({
   expenses: [],
   debts: [],
+  incomingTransactions: [],
+  customIncomingSources: [],
   categories: DEFAULT_CATEGORIES,
   initialCashText: '',
   initialBankText: '',
@@ -154,6 +183,12 @@ const createInitialState = (): AppState => ({
     amountText: '',
     paymentMethod: DEFAULT_PAYMENT_METHOD,
     transactionDateISO: new Date().toISOString(),
+  },
+  incomingForm: {
+    amountText: '',
+    paymentMethod: DEFAULT_PAYMENT_METHOD,
+    sourceType: DEFAULT_INCOMING_SOURCE,
+    sourceOtherText: '',
   },
 });
 
@@ -216,6 +251,25 @@ const ensureDebtRuntimeState = (state: AppState) => {
       paymentMethod: DEFAULT_PAYMENT_METHOD,
       transactionDateISO: new Date().toISOString(),
     };
+  }
+};
+
+const ensureIncomingRuntimeState = (state: AppState) => {
+  if (!state.incomingForm) {
+    state.incomingForm = {
+      amountText: '',
+      paymentMethod: DEFAULT_PAYMENT_METHOD,
+      sourceType: DEFAULT_INCOMING_SOURCE,
+      sourceOtherText: '',
+    };
+  }
+
+  if (!Array.isArray(state.incomingTransactions)) {
+    state.incomingTransactions = [];
+  }
+
+  if (!Array.isArray(state.customIncomingSources)) {
+    state.customIncomingSources = [];
   }
 };
 
@@ -307,6 +361,40 @@ const appSlice = createSlice({
       ensureDebtRuntimeState(state);
       state.debtTransactionForm.transactionDateISO = action.payload;
     },
+    setIncomingAmountText(state, action: PayloadAction<string>) {
+      ensureIncomingRuntimeState(state);
+      state.incomingForm.amountText = action.payload;
+    },
+    setIncomingPaymentMethod(state, action: PayloadAction<PaymentMethod>) {
+      ensureIncomingRuntimeState(state);
+      state.incomingForm.paymentMethod = normalizePaymentMethod(action.payload);
+    },
+    setIncomingSourceType(state, action: PayloadAction<IncomingMoneySourceType>) {
+      ensureIncomingRuntimeState(state);
+      state.incomingForm.sourceType = normalizeIncomingSourceType(action.payload);
+    },
+    setIncomingSourceOtherText(state, action: PayloadAction<string>) {
+      ensureIncomingRuntimeState(state);
+      state.incomingForm.sourceOtherText = action.payload;
+    },
+    addIncomingCustomSourceFromForm(state) {
+      ensureIncomingRuntimeState(state);
+      const cleanLabel = state.incomingForm.sourceOtherText.trim();
+
+      if (!cleanLabel) {
+        return;
+      }
+
+      const alreadyExists = state.customIncomingSources.some(
+        item => item.toLowerCase() === cleanLabel.toLowerCase(),
+      );
+
+      if (alreadyExists) {
+        return;
+      }
+
+      state.customIncomingSources = [cleanLabel, ...state.customIncomingSources];
+    },
     resetForm(state) {
       resetFormValues(state);
     },
@@ -317,6 +405,13 @@ const appSlice = createSlice({
       state.debtTransactionForm.transactionDateISO = new Date().toISOString();
       state.debtTransactionForm.paymentMethod = DEFAULT_PAYMENT_METHOD;
       state.debtTransactionForm.selectedDebtId = state.debts[0]?.id ?? null;
+    },
+    resetIncomingForm(state) {
+      ensureIncomingRuntimeState(state);
+      state.incomingForm.amountText = '';
+      state.incomingForm.paymentMethod = DEFAULT_PAYMENT_METHOD;
+      state.incomingForm.sourceType = DEFAULT_INCOMING_SOURCE;
+      state.incomingForm.sourceOtherText = '';
     },
     addCategoryFromForm(state) {
       const clean = state.form.newCategory.trim();
@@ -486,6 +581,52 @@ const appSlice = createSlice({
       state.debtTransactionForm.amountText = '';
       state.debtTransactionForm.transactionDateISO = new Date().toISOString();
     },
+    saveIncomingFromForm(state) {
+      ensureIncomingRuntimeState(state);
+      const amount = Number(state.incomingForm.amountText);
+      const paymentMethod = normalizePaymentMethod(state.incomingForm.paymentMethod);
+      const sourceType = normalizeIncomingSourceType(state.incomingForm.sourceType);
+      const otherLabel = state.incomingForm.sourceOtherText.trim();
+
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return;
+      }
+
+      if (sourceType === 'other' && !otherLabel) {
+        return;
+      }
+
+      adjustBalance(state, paymentMethod, amount);
+
+      const sourceLabel = sourceType === 'other' ? otherLabel : sourceType;
+
+      const transaction: IncomingMoneyTransaction = {
+        id: `${Date.now()}_${Math.random()}`,
+        amount,
+        paymentMethod,
+        sourceType,
+        sourceLabel,
+        dateISO: new Date().toISOString(),
+      };
+
+      state.incomingTransactions = [transaction, ...state.incomingTransactions];
+      state.incomingForm.amountText = '';
+      state.incomingForm.sourceOtherText = '';
+    },
+    deleteIncomingTransaction(state, action: PayloadAction<string>) {
+      ensureIncomingRuntimeState(state);
+      const transactionId = action.payload;
+      const transaction = state.incomingTransactions.find(item => item.id === transactionId);
+
+      if (!transaction) {
+        return;
+      }
+
+      adjustBalance(state, transaction.paymentMethod, -transaction.amount);
+      state.incomingTransactions = state.incomingTransactions.filter(
+        item => item.id !== transactionId,
+      );
+    },
     deleteDebt(state, action: PayloadAction<string>) {
       const debtId = action.payload;
       const debt = state.debts.find(item => item.id === debtId);
@@ -547,12 +688,16 @@ const appSlice = createSlice({
 
 export const {
   addCategoryFromForm,
+  addIncomingCustomSourceFromForm,
+  deleteIncomingTransaction,
   deleteDebt,
   deleteExpense,
   openMonthDetails,
   resetForm,
   resetDebtForms,
+  resetIncomingForm,
   saveDebtFromForm,
+  saveIncomingFromForm,
   saveDebtTransactionFromForm,
   saveExpenseFromForm,
   setAmountText,
@@ -568,6 +713,10 @@ export const {
   setDebtTransactionDebtId,
   setDebtTransactionPaymentMethod,
   setExpenseDateISO,
+  setIncomingAmountText,
+  setIncomingPaymentMethod,
+  setIncomingSourceOtherText,
+  setIncomingSourceType,
   setInitialBankText,
   setInitialCashText,
   setInitialWalletText,

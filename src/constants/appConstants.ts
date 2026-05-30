@@ -1,5 +1,10 @@
 import {Dimensions} from 'react-native';
-import {DebtDirection, DebtStatus, PaymentMethod} from '../types/expense';
+import {
+  DebtDirection,
+  DebtStatus,
+  IncomingMoneySourceType,
+  PaymentMethod,
+} from '../types/expense';
 
 export const DEFAULT_CATEGORIES = ['طعام', 'ديون', 'مواصلات', 'تسوق', 'أخرى'];
 
@@ -9,6 +14,22 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: 'النقد المتوفر',
   bank: 'رصيد البنك',
   wallet: 'رصيد المحفظة',
+};
+
+export const INCOMING_MONEY_SOURCES: IncomingMoneySourceType[] = [
+  'salary',
+  'freelance',
+  'gift',
+  'refund',
+  'other',
+];
+
+export const INCOMING_MONEY_SOURCE_LABELS: Record<IncomingMoneySourceType, string> = {
+  salary: 'راتب',
+  freelance: 'عمل إضافي',
+  gift: 'هدية',
+  refund: 'استرجاع',
+  other: 'أخرى',
 };
 
 export const DEBT_DIRECTION_LABELS: Record<DebtDirection, string> = {

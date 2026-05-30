@@ -10,6 +10,22 @@ export type Expense = {
 
 export type PaymentMethod = 'cash' | 'bank' | 'wallet';
 
+export type IncomingMoneySourceType =
+  | 'salary'
+  | 'freelance'
+  | 'gift'
+  | 'refund'
+  | 'other';
+
+export type IncomingMoneyTransaction = {
+  id: string;
+  amount: number;
+  paymentMethod: PaymentMethod;
+  sourceType: IncomingMoneySourceType;
+  sourceLabel: string;
+  dateISO: string;
+};
+
 export type DebtDirection = 'owe' | 'owedToMe';
 
 export type DebtStatus = 'active' | 'settled' | 'overdue';

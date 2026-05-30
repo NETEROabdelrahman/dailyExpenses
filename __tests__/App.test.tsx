@@ -95,6 +95,14 @@ const mockState = {
       paymentMethod: 'cash',
       transactionDateISO: new Date().toISOString(),
     },
+    incomingForm: {
+      amountText: '',
+      paymentMethod: 'cash',
+      sourceType: 'salary',
+      sourceOtherText: '',
+    },
+    incomingTransactions: [],
+    customIncomingSources: [],
   },
 };
 
@@ -106,12 +114,15 @@ jest.mock('../src/store/hooks', () => ({
 
 jest.mock('../src/store/appSlice', () => ({
   addCategoryFromForm: () => ({type: 'app/addCategoryFromForm'}),
+  addIncomingCustomSourceFromForm: () => ({type: 'app/addIncomingCustomSourceFromForm'}),
+  deleteIncomingTransaction: (payload: string) => ({type: 'app/deleteIncomingTransaction', payload}),
   deleteDebt: (payload: string) => ({type: 'app/deleteDebt', payload}),
   deleteExpense: (payload: string) => ({type: 'app/deleteExpense', payload}),
   openMonthDetails: (payload: string) => ({type: 'app/openMonthDetails', payload}),
   resetDebtForms: () => ({type: 'app/resetDebtForms'}),
   resetForm: () => ({type: 'app/resetForm'}),
   saveDebtFromForm: () => ({type: 'app/saveDebtFromForm'}),
+  saveIncomingFromForm: () => ({type: 'app/saveIncomingFromForm'}),
   saveDebtTransactionFromForm: () => ({type: 'app/saveDebtTransactionFromForm'}),
   saveExpenseFromForm: () => ({type: 'app/saveExpenseFromForm'}),
   setAmountText: (payload: string) => ({type: 'app/setAmountText', payload}),
@@ -124,6 +135,10 @@ jest.mock('../src/store/appSlice', () => ({
   setDebtTransactionDebtId: (payload: string) => ({type: 'app/setDebtTransactionDebtId', payload}),
   setDebtTransactionPaymentMethod: (payload: string) => ({type: 'app/setDebtTransactionPaymentMethod', payload}),
   setExpenseDateISO: (payload: string) => ({type: 'app/setExpenseDateISO', payload}),
+  setIncomingAmountText: (payload: string) => ({type: 'app/setIncomingAmountText', payload}),
+  setIncomingPaymentMethod: (payload: string) => ({type: 'app/setIncomingPaymentMethod', payload}),
+  setIncomingSourceOtherText: (payload: string) => ({type: 'app/setIncomingSourceOtherText', payload}),
+  setIncomingSourceType: (payload: string) => ({type: 'app/setIncomingSourceType', payload}),
   setInitialBankText: (payload: string) => ({type: 'app/setInitialBankText', payload}),
   setInitialCashText: (payload: string) => ({type: 'app/setInitialCashText', payload}),
   setInitialWalletText: (payload: string) => ({type: 'app/setInitialWalletText', payload}),

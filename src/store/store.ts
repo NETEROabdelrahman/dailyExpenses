@@ -48,6 +48,15 @@ type PersistedDebt = {
   transactions?: PersistedDebtTransaction[];
 };
 
+type PersistedIncomingMoneyTransaction = {
+  id: string;
+  amount: number;
+  paymentMethod?: 'cash' | 'bank' | 'wallet';
+  sourceType?: 'salary' | 'freelance' | 'gift' | 'refund' | 'other';
+  sourceLabel?: string;
+  dateISO: string;
+};
+
 const rootReducer = combineReducers({
   app: appReducer,
 });
@@ -61,6 +70,12 @@ type PersistedRootState = ReturnType<typeof rootReducer> & {
     initialBankText?: string;
     initialWalletText?: string;
     walletText?: string;
+    incomingTransactions?: PersistedIncomingMoneyTransaction[];
+    customIncomingSources?: string[];
+    incomingForm?: ReturnType<typeof appReducer>['incomingForm'] & {
+      paymentMethod?: 'cash' | 'bank' | 'wallet';
+      sourceType?: 'salary' | 'freelance' | 'gift' | 'refund' | 'other';
+    };
     form?: ReturnType<typeof appReducer>['form'] & {
       selectedPaymentMethod?: 'cash' | 'bank' | 'wallet';
     };
@@ -218,11 +233,92 @@ const migrations: MigrationManifest = {
     nextState.app = nextApp;
     return nextState;
   },
+  4: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+
+    if (!Array.isArray(nextApp.incomingTransactions)) {
+      nextApp.incomingTransactions = [];
+    }
+
+    nextApp.incomingTransactions = nextApp.incomingTransactions.map(item => ({
+      ...item,
+      paymentMethod:
+        item.paymentMethod === 'bank' || item.paymentMethod === 'wallet'
+          ? item.paymentMethod
+          : 'cash',
+      sourceType:
+        item.sourceType === 'freelance' ||
+        item.sourceType === 'gift' ||
+        item.sourceType === 'refund' ||
+        item.sourceType === 'other'
+          ? item.sourceType
+          : 'salary',
+      sourceLabel: typeof item.sourceLabel === 'string' ? item.sourceLabel : '',
+    }));
+
+    if (nextApp.incomingForm) {
+      nextApp.incomingForm = {
+        ...nextApp.incomingForm,
+        paymentMethod:
+          nextApp.incomingForm.paymentMethod === 'bank' ||
+          nextApp.incomingForm.paymentMethod === 'wallet'
+            ? nextApp.incomingForm.paymentMethod
+            : 'cash',
+        sourceType:
+          nextApp.incomingForm.sourceType === 'freelance' ||
+          nextApp.incomingForm.sourceType === 'gift' ||
+          nextApp.incomingForm.sourceType === 'refund' ||
+          nextApp.incomingForm.sourceType === 'other'
+            ? nextApp.incomingForm.sourceType
+            : 'salary',
+      };
+    } else {
+      nextApp.incomingForm = {
+        amountText: '',
+        paymentMethod: 'cash',
+        sourceType: 'salary',
+        sourceOtherText: '',
+      };
+    }
+
+    nextState.app = nextApp;
+    return nextState;
+  },
+  5: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+
+    if (!Array.isArray(nextApp.customIncomingSources)) {
+      nextApp.customIncomingSources = [];
+    }
+
+    nextState.app = nextApp;
+    return nextState;
+  },
 };
 
 const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: 'root',
-  version: 3,
+  version: 5,
   storage: AsyncStorage,
   whitelist: ['app'],
   migrate: createMigrate(migrations, {debug: false}),

@@ -27,6 +27,8 @@ import {
   DEBT_DIRECTION_LABELS,
   DEBT_STATUS_LABELS,
   getCategoryColor,
+  INCOMING_MONEY_SOURCE_LABELS,
+  INCOMING_MONEY_SOURCES,
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHODS,
 } from './src/constants/appConstants';
@@ -35,12 +37,15 @@ import {currentMonthKey, formatDate, formatMonthLabel, toMonthKey} from './src/u
 import {useAppDispatch, useAppSelector} from './src/store/hooks';
 import {
   addCategoryFromForm,
+  addIncomingCustomSourceFromForm,
+  deleteIncomingTransaction,
   deleteDebt,
   deleteExpense,
   openMonthDetails,
   resetDebtForms,
   resetForm,
   saveDebtFromForm,
+  saveIncomingFromForm,
   saveDebtTransactionFromForm,
   saveExpenseFromForm,
   setAmountText,
@@ -53,6 +58,10 @@ import {
   setDebtTransactionDebtId,
   setDebtTransactionPaymentMethod,
   setExpenseDateISO,
+  setIncomingAmountText,
+  setIncomingPaymentMethod,
+  setIncomingSourceOtherText,
+  setIncomingSourceType,
   setInitialBankText,
   setInitialCashText,
   setInitialWalletText,
@@ -98,6 +107,9 @@ function AppContent(): React.JSX.Element {
     form,
     debtForm: rawDebtForm,
     debtTransactionForm: rawDebtTransactionForm,
+    incomingForm: rawIncomingForm,
+    incomingTransactions: rawIncomingTransactions,
+    customIncomingSources: rawCustomIncomingSources,
   } = useAppSelector(state => state.app);
 
   const debtForm = rawDebtForm ?? {
@@ -114,6 +126,16 @@ function AppContent(): React.JSX.Element {
     paymentMethod: 'cash' as const,
     transactionDateISO: new Date().toISOString(),
   };
+
+  const incomingForm = rawIncomingForm ?? {
+    amountText: '',
+    paymentMethod: 'cash' as const,
+    sourceType: 'salary' as const,
+    sourceOtherText: '',
+  };
+
+  const incomingTransactions = rawIncomingTransactions ?? [];
+  const customIncomingSources = rawCustomIncomingSources ?? [];
 
   const {
     name,
@@ -330,6 +352,58 @@ function AppContent(): React.JSX.Element {
     dispatch(saveDebtTransactionFromForm());
   };
 
+  const submitIncomingMoney = () => {
+    const amount = Number(incomingForm.amountText);
+    const validAmountPattern = /^\d+(\.\d{1,2})?$/;
+
+    if (
+      !validAmountPattern.test(incomingForm.amountText) ||
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
+      Alert.alert('قيمة غير صحيحة', 'أدخل مبلغاً صحيحاً أكبر من صفر.');
+      return;
+    }
+
+    if (incomingForm.sourceType === 'other' && !incomingForm.sourceOtherText.trim()) {
+      Alert.alert('بيانات ناقصة', 'اكتب مصدر المال عند اختيار "أخرى".');
+      return;
+    }
+
+    dispatch(saveIncomingFromForm());
+  };
+
+  const addCustomIncomingSource = () => {
+    const cleanLabel = incomingForm.sourceOtherText.trim();
+
+    if (!cleanLabel) {
+      Alert.alert('بيانات ناقصة', 'اكتب اسم المصدر لإضافته.');
+      return;
+    }
+
+    const alreadyExists = customIncomingSources.some(
+      item => item.toLowerCase() === cleanLabel.toLowerCase(),
+    );
+
+    if (alreadyExists) {
+      Alert.alert('موجود بالفعل', 'هذا المصدر موجود مسبقاً.');
+      return;
+    }
+
+    dispatch(addIncomingCustomSourceFromForm());
+  };
+
+  const confirmDeleteIncomingTransaction = (transactionId: string) => {
+    Alert.alert('تأكيد الحذف', 'هل تريد حذف هذا المبلغ الوارد؟', [
+      {text: 'إلغاء', style: 'cancel'},
+      {
+        text: 'حذف',
+        style: 'destructive',
+        onPress: () => dispatch(deleteIncomingTransaction(transactionId)),
+      },
+    ]);
+  };
+
   const animateDrawer = (open: boolean) => {
     if (open) {
       setShowNavMenu(true);
@@ -540,6 +614,145 @@ function AppContent(): React.JSX.Element {
         onInitialBankChange={value => dispatch(setInitialBankText(sanitizeAmountInput(value)))}
         onInitialWalletChange={value => dispatch(setInitialWalletText(sanitizeAmountInput(value)))}
       />
+
+      <View style={styles.balanceActionCard}>
+        <Text style={styles.sectionTitle}>إضافة مبلغ وارد</Text>
+
+        <View style={styles.compactFieldsRow}>
+          <View style={styles.compactField}>
+            <Text style={styles.label}>المبلغ</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="0"
+              keyboardType="numeric"
+              value={incomingForm.amountText}
+              onChangeText={value => dispatch(setIncomingAmountText(sanitizeAmountInput(value)))}
+            />
+          </View>
+
+          <View style={styles.compactField}>
+            <Text style={styles.label}>إلى أي رصيد</Text>
+            <View style={styles.pickerWrap}>
+              <Picker
+                selectedValue={incomingForm.paymentMethod}
+                onValueChange={itemValue =>
+                  dispatch(setIncomingPaymentMethod(itemValue as 'cash' | 'bank' | 'wallet'))
+                }>
+                {PAYMENT_METHODS.map(method => (
+                  <Picker.Item
+                    key={method}
+                    label={PAYMENT_METHOD_LABELS[method]}
+                    value={method}
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.compactField}>
+          <Text style={styles.label}>مصدر المبلغ</Text>
+          <View style={styles.pickerWrap}>
+            <Picker
+              selectedValue={incomingForm.sourceType}
+              onValueChange={itemValue =>
+                dispatch(
+                  setIncomingSourceType(
+                    itemValue as 'salary' | 'freelance' | 'gift' | 'refund' | 'other',
+                  ),
+                )
+              }>
+              {INCOMING_MONEY_SOURCES.map(source => (
+                <Picker.Item
+                  key={source}
+                  label={INCOMING_MONEY_SOURCE_LABELS[source]}
+                  value={source}
+                />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        {incomingForm.sourceType === 'other' ? (
+          <View style={styles.customSourceCard}>
+            {customIncomingSources.length > 0 ? (
+              <View style={styles.compactField}>
+                <Text style={styles.label}>مصدر مخصص محفوظ</Text>
+                <View style={styles.pickerWrap}>
+                  <Picker
+                    selectedValue={incomingForm.sourceOtherText}
+                    onValueChange={itemValue =>
+                      dispatch(setIncomingSourceOtherText(String(itemValue)))
+                    }>
+                    <Picker.Item label="اختر مصدر محفوظ" value="" />
+                    {customIncomingSources.map(source => (
+                      <Picker.Item key={source} label={source} value={source} />
+                    ))}
+                  </Picker>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.inlineRow}>
+              <TextInput
+                style={[styles.input, styles.flexInput]}
+                placeholder="مثال: بيع أغراض"
+                value={incomingForm.sourceOtherText}
+                onChangeText={value => dispatch(setIncomingSourceOtherText(value))}
+              />
+              <TouchableOpacity style={styles.secondaryBtn} onPress={addCustomIncomingSource}>
+                <Text style={styles.btnText}>حفظ المصدر</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+
+        <TouchableOpacity style={styles.primaryBtn} onPress={submitIncomingMoney}>
+          <Text style={styles.btnText}>إضافة المبلغ</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.balanceActionCard}>
+        <Text style={styles.sectionTitle}>آخر المبالغ الواردة</Text>
+
+        {incomingTransactions.length === 0 ? (
+          <Text style={styles.emptyText}>لا توجد مبالغ واردة حتى الآن.</Text>
+        ) : (
+          incomingTransactions.slice(0, 8).map(item => {
+            const sourceText =
+              item.sourceType === 'other' && item.sourceLabel
+                ? item.sourceLabel
+                : INCOMING_MONEY_SOURCE_LABELS[item.sourceType];
+
+            return (
+              <View key={item.id} style={styles.balanceHistoryItem}>
+                <View style={styles.debtItemRow}>
+                  <Text style={styles.debtItemValue}>{item.amount.toFixed(2)} ج.م</Text>
+                  <Text style={styles.debtItemLabel}>المبلغ</Text>
+                </View>
+                <View style={styles.debtItemRow}>
+                  <Text style={styles.debtItemValue}>{PAYMENT_METHOD_LABELS[item.paymentMethod]}</Text>
+                  <Text style={styles.debtItemLabel}>الرصيد</Text>
+                </View>
+                <View style={styles.debtItemRow}>
+                  <Text style={styles.debtItemValue}>{sourceText}</Text>
+                  <Text style={styles.debtItemLabel}>المصدر</Text>
+                </View>
+                <View style={styles.debtItemRow}>
+                  <Text style={styles.debtItemValue}>{formatDate(item.dateISO)}</Text>
+                  <Text style={styles.debtItemLabel}>التاريخ</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.deleteBtnLarge}
+                  onPress={() => confirmDeleteIncomingTransaction(item.id)}>
+                  <Text style={styles.btnText}>حذف الحركة</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })
+        )}
+      </View>
     </>
   );
 
@@ -1007,6 +1220,15 @@ const styles = StyleSheet.create({
   compactField: {
     flex: 1,
   },
+  customSourceCard: {
+    backgroundColor: '#e2e8f0',
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  flexInput: {
+    flex: 1,
+  },
   primaryBtn: {
     marginTop: 6,
     backgroundColor: '#0284c7',
@@ -1015,6 +1237,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: 'center',
     flex: 1,
+  },
+  secondaryBtn: {
+    marginTop: 6,
+    backgroundColor: '#1d4ed8',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
   },
   cancelBtn: {
     marginTop: 6,
@@ -1036,6 +1266,12 @@ const styles = StyleSheet.create({
   },
   debtCard: {
     backgroundColor: '#fff7ed',
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+  },
+  balanceActionCard: {
+    backgroundColor: '#f0f9ff',
     borderRadius: 14,
     padding: 14,
     gap: 8,
@@ -1070,6 +1306,12 @@ const styles = StyleSheet.create({
   },
   debtItem: {
     backgroundColor: '#ffedd5',
+    borderRadius: 12,
+    padding: 12,
+    gap: 6,
+  },
+  balanceHistoryItem: {
+    backgroundColor: '#e0f2fe',
     borderRadius: 12,
     padding: 12,
     gap: 6,
