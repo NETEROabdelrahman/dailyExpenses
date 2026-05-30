@@ -1,0 +1,2 @@
+export const DRAWER_WIDTH = 280;
+export const DRAWER_OPEN_THRESHOLD = DRAWER_WIDTH * 0.35;

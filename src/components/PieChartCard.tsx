@@ -1,6 +1,6 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import Svg, {G, Path, Text as SvgText} from 'react-native-svg';
+import Svg, {G, Path} from 'react-native-svg';
 import {arc as d3Arc, pie as d3Pie, PieArcDatum} from 'd3-shape';
 import {PIE_CHART_SIZE} from '../constants/appConstants';
 import {PieDatum} from '../types/expense';
@@ -31,9 +31,6 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
                   const arcGenerator = d3Arc<PieArcDatum<PieDatum>>()
                     .innerRadius(0)
                     .outerRadius(radius - 4);
-                  const labelArc = d3Arc<PieArcDatum<PieDatum>>()
-                    .innerRadius(radius * 0.62)
-                    .outerRadius(radius * 0.62);
 
                   return slices.map(slice => {
                     const path = arcGenerator(slice);
@@ -41,22 +38,9 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
                       return null;
                     }
 
-                    const [labelX, labelY] = labelArc.centroid(slice);
-                    const percentage = total > 0 ? (slice.data.population / total) * 100 : 0;
-
                     return (
                       <G key={slice.data.name}>
                         <Path d={path} fill={slice.data.color} />
-                        <SvgText
-                          x={labelX}
-                          y={labelY}
-                          fill="#ffffff"
-                          fontSize="13"
-                          fontWeight="700"
-                          textAnchor="middle"
-                          alignmentBaseline="middle">
-                          {`${percentage.toFixed(0)}%`}
-                        </SvgText>
                       </G>
                     );
                   });
