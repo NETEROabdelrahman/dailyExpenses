@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, TextInput, TouchableOpacity, View} from 'react-native';
+import {Alert, Text, TextInput, TouchableOpacity, View} from 'react-native';
 import {Picker} from '@react-native-picker/picker';
 import DateTimePicker, {DateTimePickerEvent} from '@react-native-community/datetimepicker';
 import PageHeader from '../../components/PageHeader';
@@ -329,7 +329,16 @@ function DebtsPage({
 
                 <TouchableOpacity
                   style={styles.deleteBtnLarge}
-                  onPress={() => onDeleteDebt(item.id)}>
+                  onPress={() => {
+                    Alert.alert('تأكيد الحذف', 'هل تريد حذف هذا الدين؟', [
+                      {text: 'إلغاء', style: 'cancel'},
+                      {
+                        text: 'حذف',
+                        style: 'destructive',
+                        onPress: () => onDeleteDebt(item.id),
+                      },
+                    ]);
+                  }}>
                   <Text style={styles.btnText}>حذف الدين</Text>
                 </TouchableOpacity>
               </View>
