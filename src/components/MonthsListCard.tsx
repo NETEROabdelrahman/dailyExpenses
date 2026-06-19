@@ -1,28 +1,38 @@
 import React from 'react';
 import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
-import {formatMonthLabel} from '../utils/date';
+import {AccountingPeriod} from '../types/expense';
+import {formatDate, formatPeriodLabel} from '../utils/date';
 
 type MonthsListCardProps = {
-  months: string[];
-  onSelectMonth: (month: string) => void;
+  periods: AccountingPeriod[];
+  onSelectMonth: (periodId: string) => void;
 };
 
 function MonthsListCard({
-  months,
+  periods,
   onSelectMonth,
 }: MonthsListCardProps): React.JSX.Element {
   return (
     <View style={styles.card}>
-      {months.length === 0 ? (
+      {periods.length === 0 ? (
         <Text style={styles.emptyText}>لا توجد شهور سابقة حتى الآن</Text>
       ) : (
-        months.map(month => (
+        periods.map(period => (
           <TouchableOpacity
-            key={month}
+            key={period.id}
             style={styles.monthRow}
-            onPress={() => onSelectMonth(month)}>
+            onPress={() => onSelectMonth(period.id)}>
             <Text style={styles.monthRowArrow}>‹</Text>
-            <Text style={styles.monthRowLabel}>{formatMonthLabel(month)}</Text>
+            <View style={styles.monthTextWrap}>
+              <Text style={styles.monthRowLabel}>
+                {formatPeriodLabel(period.startedAtISO)}
+              </Text>
+              {period.endedAtISO ? (
+                <Text style={styles.monthRowMeta}>
+                  انتهى في {formatDate(period.endedAtISO)}
+                </Text>
+              ) : null}
+            </View>
           </TouchableOpacity>
         ))
       )}
@@ -54,6 +64,16 @@ const styles = StyleSheet.create({
     color: '#0f172a',
     fontWeight: '600',
     fontSize: 16,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  monthTextWrap: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
+  monthRowMeta: {
+    color: '#64748b',
+    fontSize: 12,
     textAlign: 'right',
     writingDirection: 'rtl',
   },

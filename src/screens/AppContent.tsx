@@ -17,8 +17,8 @@ import {
   PAYMENT_METHOD_LABELS,
 } from '../constants/appConstants';
 import {DRAWER_OPEN_THRESHOLD, DRAWER_WIDTH} from '../constants/layout';
-import {PieDatum} from '../types/expense';
-import {currentMonthKey, toMonthKey} from '../utils/date';
+import {AccountingPeriod, BalanceTransaction, PieDatum} from '../types/expense';
+import {formatDate, formatPeriodLabel} from '../utils/date';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {
   addCategoryFromForm,
@@ -26,13 +26,16 @@ import {
   deleteIncomingTransaction,
   deleteDebt,
   deleteExpense,
+  endCurrentMonth,
   openMonthDetails,
   resetDebtForms,
   resetForm,
+  resetTransferForm,
   saveDebtFromForm,
   saveIncomingFromForm,
   saveDebtTransactionFromForm,
   saveExpenseFromForm,
+  saveTransferFromForm,
   setAmountText,
   setDebtDirection,
   setDebtDueDateISO,
@@ -47,9 +50,10 @@ import {
   setIncomingPaymentMethod,
   setIncomingSourceOtherText,
   setIncomingSourceType,
-  setInitialBankText,
-  setInitialCashText,
-  setInitialWalletText,
+  setTransferAmountText,
+  setTransferFromPaymentMethod,
+  setTransferNotes,
+  setTransferToPaymentMethod,
   setName,
   setNewCategory,
   setNotes,
@@ -66,6 +70,8 @@ import MonthDetailsPage from './pages/MonthDetailsPage';
 import MonthsPage from './pages/MonthsPage';
 
 const DEBT_PAYMENTS_CATEGORY = 'ديون';
+const EMPTY_BALANCE_TRANSACTIONS: BalanceTransaction[] = [];
+const EMPTY_PERIODS: AccountingPeriod[] = [];
 
 function AppContent(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -77,20 +83,17 @@ function AppContent(): React.JSX.Element {
   const {
     expenses,
     debts,
+    balanceTransactions: rawBalanceTransactions,
+    periods: rawPeriods,
+    currentPeriodId: rawCurrentPeriodId,
     categories,
-    initialCashText,
-    initialBankText,
-    initialWalletText,
-    cashText,
-    bankText,
-    walletText,
     page,
     selectedMonth,
     form,
     debtForm: rawDebtForm,
     debtTransactionForm: rawDebtTransactionForm,
     incomingForm: rawIncomingForm,
-    incomingTransactions: rawIncomingTransactions,
+    transferForm: rawTransferForm,
     customIncomingSources: rawCustomIncomingSources,
   } = useAppSelector(state => state.app);
 
@@ -116,8 +119,20 @@ function AppContent(): React.JSX.Element {
     sourceOtherText: '',
   };
 
-  const incomingTransactions = rawIncomingTransactions ?? [];
+  const transferForm = rawTransferForm ?? {
+    amountText: '',
+    fromPaymentMethod: 'wallet' as const,
+    toPaymentMethod: 'cash' as const,
+    notes: '',
+  };
+
   const customIncomingSources = rawCustomIncomingSources ?? [];
+  const balanceTransactions = rawBalanceTransactions ?? EMPTY_BALANCE_TRANSACTIONS;
+  const periods = rawPeriods ?? EMPTY_PERIODS;
+  const currentPeriodId = rawCurrentPeriodId ?? periods.find(
+    period => period.endedAtISO === null,
+  )?.id ?? 'period_1';
+  const currentPeriod = periods.find(period => period.id === currentPeriodId) ?? null;
 
   const {
     name,
@@ -133,16 +148,24 @@ function AppContent(): React.JSX.Element {
   const expenseDate = useMemo(() => new Date(expenseDateISO), [expenseDateISO]);
   const debtDueDate = useMemo(() => new Date(debtForm.dueDateISO), [debtForm.dueDateISO]);
 
-  const monthOptions = useMemo(() => {
-    const uniqueMonths = Array.from(
-      new Set(expenses.map(item => toMonthKey(item.dateISO))),
-    ).sort((a, b) => b.localeCompare(a));
-    return uniqueMonths;
-  }, [expenses]);
+  const closedPeriods = useMemo(
+    () =>
+      periods
+        .filter(period => period.endedAtISO !== null)
+        .sort((first, second) =>
+          (second.endedAtISO ?? '').localeCompare(first.endedAtISO ?? ''),
+        ),
+    [periods],
+  );
 
-  const pastMonths = useMemo(
-    () => monthOptions.filter(month => month < currentMonthKey()),
-    [monthOptions],
+  const currentPeriodExpenses = useMemo(
+    () => expenses.filter(item => (item.periodKey ?? currentPeriodId) === currentPeriodId),
+    [currentPeriodId, expenses],
+  );
+
+  const selectedPeriod = useMemo(
+    () => periods.find(period => period.id === selectedMonth) ?? null,
+    [periods, selectedMonth],
   );
 
   const selectedMonthExpenses = useMemo(() => {
@@ -150,28 +173,103 @@ function AppContent(): React.JSX.Element {
       return [];
     }
 
-    return expenses.filter(item => toMonthKey(item.dateISO) === selectedMonth);
+    return expenses.filter(item => item.periodKey === selectedMonth);
   }, [expenses, selectedMonth]);
 
   const totalAllExpenses = useMemo(
-    () => expenses.reduce((sum, item) => sum + item.amount, 0),
-    [expenses],
+    () => currentPeriodExpenses.reduce((sum, item) => sum + item.amount, 0),
+    [currentPeriodExpenses],
   );
 
-  const totalInitialBalance = useMemo(() => {
-    const cash = Number(initialCashText) || 0;
-    const bank = Number(initialBankText) || 0;
-    const wallet = Number(initialWalletText) || 0;
-    return cash + bank + wallet;
-  }, [initialBankText, initialCashText, initialWalletText]);
-
-  const remainingCash = useMemo(() => Number(cashText) || 0, [cashText]);
-  const remainingBank = useMemo(() => Number(bankText) || 0, [bankText]);
-  const remainingWallet = useMemo(() => Number(walletText) || 0, [walletText]);
+  const remainingCash = useMemo(
+    () =>
+      balanceTransactions
+        .filter(item => item.paymentMethod === 'cash')
+        .reduce((sum, item) => sum + item.amount, 0),
+    [balanceTransactions],
+  );
+  const remainingBank = useMemo(
+    () =>
+      balanceTransactions
+        .filter(item => item.paymentMethod === 'bank')
+        .reduce((sum, item) => sum + item.amount, 0),
+    [balanceTransactions],
+  );
+  const remainingWallet = useMemo(
+    () =>
+      balanceTransactions
+        .filter(item => item.paymentMethod === 'wallet')
+        .reduce((sum, item) => sum + item.amount, 0),
+    [balanceTransactions],
+  );
 
   const totalRemainingBalance = useMemo(
     () => remainingCash + remainingBank + remainingWallet,
     [remainingBank, remainingCash, remainingWallet],
+  );
+
+  const currentPeriodBalanceTransactions = useMemo(
+    () =>
+      balanceTransactions.filter(
+        item => (item.periodKey ?? currentPeriodId) === currentPeriodId,
+      ),
+    [balanceTransactions, currentPeriodId],
+  );
+
+  const currentPeriodSummary = useMemo(() => {
+    return currentPeriodBalanceTransactions.reduce(
+      (acc, item) => {
+        if (item.type === 'incoming') {
+          acc.income += item.amount;
+        }
+
+        if (item.type === 'expense') {
+          acc.expenses += Math.abs(item.amount);
+        }
+
+        if (item.type === 'debtPayment') {
+          acc.debtPayments += Math.abs(item.amount);
+        }
+
+        if (item.type === 'debtCollection') {
+          acc.debtCollections += item.amount;
+        }
+
+        acc.net += item.amount;
+        return acc;
+      },
+      {
+        income: 0,
+        expenses: 0,
+        debtPayments: 0,
+        debtCollections: 0,
+        net: 0,
+      },
+    );
+  }, [currentPeriodBalanceTransactions]);
+
+  const currentPeriodStartedText = useMemo(() => {
+    if (!currentPeriod?.startedAtISO) {
+      return '';
+    }
+
+    const startedAt = new Date(currentPeriod.startedAtISO);
+    const now = new Date();
+    const elapsedMs = now.getTime() - startedAt.getTime();
+    const daysSinceStart = Math.max(
+      0,
+      Math.floor(elapsedMs / (1000 * 60 * 60 * 24)),
+    );
+
+    return `${formatDate(currentPeriod.startedAtISO)} - منذ ${daysSinceStart} يوم`;
+  }, [currentPeriod?.startedAtISO]);
+
+  const currentPeriodLabel = useMemo(
+    () =>
+      currentPeriod?.startedAtISO
+        ? formatPeriodLabel(currentPeriod.startedAtISO)
+        : 'الشهر الحالي',
+    [currentPeriod?.startedAtISO],
   );
 
   const selectedPaymentMethodBalance = useMemo(() => {
@@ -186,17 +284,29 @@ function AppContent(): React.JSX.Element {
     return remainingWallet;
   }, [remainingBank, remainingCash, remainingWallet, selectedPaymentMethod]);
 
+  const getAvailableBalance = (paymentMethod: 'cash' | 'bank' | 'wallet') => {
+    if (paymentMethod === 'cash') {
+      return remainingCash;
+    }
+
+    if (paymentMethod === 'bank') {
+      return remainingBank;
+    }
+
+    return remainingWallet;
+  };
+
   const totalSelectedMonthExpenses = useMemo(
     () => selectedMonthExpenses.reduce((sum, item) => sum + item.amount, 0),
     [selectedMonthExpenses],
   );
 
   const totalsByCategoryAll = useMemo(() => {
-    return expenses.reduce<Record<string, number>>((acc, item) => {
+    return currentPeriodExpenses.reduce<Record<string, number>>((acc, item) => {
       acc[item.category] = (acc[item.category] ?? 0) + item.amount;
       return acc;
     }, {});
-  }, [expenses]);
+  }, [currentPeriodExpenses]);
 
   const debtPaymentsTotalsByCategoryAll = useMemo(() => {
     return debts.reduce<Record<string, number>>((acc, debt) => {
@@ -205,13 +315,15 @@ function AppContent(): React.JSX.Element {
           return;
         }
 
-        acc[DEBT_PAYMENTS_CATEGORY] =
-          (acc[DEBT_PAYMENTS_CATEGORY] ?? 0) + transaction.amount;
+        if ((transaction.periodKey ?? currentPeriodId) === currentPeriodId) {
+          acc[DEBT_PAYMENTS_CATEGORY] =
+            (acc[DEBT_PAYMENTS_CATEGORY] ?? 0) + transaction.amount;
+        }
       });
 
       return acc;
     }, {});
-  }, [debts]);
+  }, [currentPeriodId, debts]);
 
   const totalsByCategorySelectedMonth = useMemo(() => {
     return selectedMonthExpenses.reduce<Record<string, number>>((acc, item) => {
@@ -231,7 +343,7 @@ function AppContent(): React.JSX.Element {
           return;
         }
 
-        if (toMonthKey(transaction.dateISO) !== selectedMonth) {
+        if (transaction.periodKey !== selectedMonth) {
           return;
         }
 
@@ -457,6 +569,37 @@ function AppContent(): React.JSX.Element {
     dispatch(addIncomingCustomSourceFromForm());
   };
 
+  const submitTransfer = () => {
+    const amount = Number(transferForm.amountText);
+    const validAmountPattern = /^\d+(\.\d{1,2})?$/;
+
+    if (
+      !validAmountPattern.test(transferForm.amountText) ||
+      !Number.isFinite(amount) ||
+      amount <= 0
+    ) {
+      Alert.alert('قيمة غير صحيحة', 'أدخل مبلغ تحويل صحيح أكبر من صفر.');
+      return;
+    }
+
+    if (transferForm.fromPaymentMethod === transferForm.toPaymentMethod) {
+      Alert.alert('تحويل غير صحيح', 'اختر رصيدين مختلفين للتحويل.');
+      return;
+    }
+
+    const available = getAvailableBalance(transferForm.fromPaymentMethod);
+
+    if (available < amount) {
+      Alert.alert(
+        'رصيد غير كافٍ',
+        `المبلغ أكبر من ${PAYMENT_METHOD_LABELS[transferForm.fromPaymentMethod]}.`,
+      );
+      return;
+    }
+
+    dispatch(saveTransferFromForm());
+  };
+
   const confirmDeleteIncomingTransaction = (transactionId: string) => {
     Alert.alert('تأكيد الحذف', 'هل تريد حذف هذا المبلغ الوارد؟', [
       {text: 'إلغاء', style: 'cancel'},
@@ -466,6 +609,20 @@ function AppContent(): React.JSX.Element {
         onPress: () => dispatch(deleteIncomingTransaction(transactionId)),
       },
     ]);
+  };
+
+  const confirmEndCurrentMonth = () => {
+    Alert.alert(
+      'إنهاء الشهر',
+      'سيتم نقل المصاريف الحالية إلى الشهور السابقة، وأي مبالغ أو مصاريف جديدة ستبدأ في شهر جديد.',
+      [
+        {text: 'إلغاء', style: 'cancel'},
+        {
+          text: 'إنهاء الشهر',
+          onPress: () => dispatch(endCurrentMonth()),
+        },
+      ],
+    );
   };
 
   const animateDrawer = (open: boolean) => {
@@ -633,6 +790,10 @@ function AppContent(): React.JSX.Element {
 
             {page === 'main' ? (
               <MainPage
+                currentPeriodLabel={currentPeriodLabel}
+                currentPeriodStartedText={currentPeriodStartedText}
+                currentPeriodSummary={currentPeriodSummary}
+                totalRemainingBalance={totalRemainingBalance}
                 name={name}
                 amountText={amountText}
                 expenseDate={expenseDate}
@@ -643,8 +804,9 @@ function AppContent(): React.JSX.Element {
                 categories={categories}
                 editingExpenseId={editingExpenseId}
                 totalAllExpenses={totalAllExpenses}
-                expenses={expenses}
+                expenses={currentPeriodExpenses}
                 pieDataAll={pieDataAll}
+                onEndCurrentMonth={confirmEndCurrentMonth}
                 onNameChange={value => dispatch(setName(value))}
                 onAmountChange={value => dispatch(setAmountText(value))}
                 onDateChange={value => dispatch(setExpenseDateISO(value.toISOString()))}
@@ -664,21 +826,15 @@ function AppContent(): React.JSX.Element {
 
             {page === 'balances' ? (
               <BalancesPage
-                initialCashText={initialCashText}
-                initialBankText={initialBankText}
-                initialWalletText={initialWalletText}
                 remainingCash={remainingCash}
                 remainingBank={remainingBank}
                 remainingWallet={remainingWallet}
-                totalBefore={totalInitialBalance}
-                totalAfter={totalRemainingBalance}
+                totalBalance={totalRemainingBalance}
                 incomingForm={incomingForm}
-                incomingTransactions={incomingTransactions}
+                transferForm={transferForm}
+                balanceTransactions={balanceTransactions}
                 customIncomingSources={customIncomingSources}
                 onBack={() => dispatch(setPage('main'))}
-                onInitialCashChange={value => dispatch(setInitialCashText(value))}
-                onInitialBankChange={value => dispatch(setInitialBankText(value))}
-                onInitialWalletChange={value => dispatch(setInitialWalletText(value))}
                 onIncomingAmountChange={value => dispatch(setIncomingAmountText(value))}
                 onIncomingPaymentMethodChange={value => dispatch(setIncomingPaymentMethod(value))}
                 onIncomingSourceTypeChange={value => dispatch(setIncomingSourceType(value))}
@@ -687,6 +843,16 @@ function AppContent(): React.JSX.Element {
                 }
                 onAddCustomIncomingSource={addCustomIncomingSource}
                 onSubmitIncomingMoney={submitIncomingMoney}
+                onTransferAmountChange={value => dispatch(setTransferAmountText(value))}
+                onTransferFromPaymentMethodChange={value =>
+                  dispatch(setTransferFromPaymentMethod(value))
+                }
+                onTransferToPaymentMethodChange={value =>
+                  dispatch(setTransferToPaymentMethod(value))
+                }
+                onTransferNotesChange={value => dispatch(setTransferNotes(value))}
+                onSubmitTransfer={submitTransfer}
+                onResetTransfer={() => dispatch(resetTransferForm())}
                 onDeleteIncomingTransaction={confirmDeleteIncomingTransaction}
               />
             ) : null}
@@ -724,15 +890,20 @@ function AppContent(): React.JSX.Element {
 
             {page === 'months' ? (
               <MonthsPage
-                months={pastMonths}
+                periods={closedPeriods}
                 onBack={() => dispatch(setPage('main'))}
-                onSelectMonth={monthKey => dispatch(openMonthDetails(monthKey))}
+                onSelectMonth={periodId => dispatch(openMonthDetails(periodId))}
               />
             ) : null}
 
             {page === 'monthDetails' ? (
               <MonthDetailsPage
                 selectedMonth={selectedMonth}
+                selectedMonthLabel={
+                  selectedPeriod?.startedAtISO
+                    ? formatPeriodLabel(selectedPeriod.startedAtISO)
+                    : ''
+                }
                 totalSelectedMonthExpenses={totalSelectedMonthExpenses}
                 selectedMonthExpenses={selectedMonthExpenses}
                 pieDataSelectedMonth={pieDataSelectedMonth}

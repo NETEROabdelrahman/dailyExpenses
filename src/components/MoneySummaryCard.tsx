@@ -1,73 +1,22 @@
 import React from 'react';
-import {StyleSheet, Text, TextInput, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
 
 type MoneySummaryCardProps = {
-  initialCashText: string;
-  initialBankText: string;
-  initialWalletText: string;
   remainingCash: number;
   remainingBank: number;
   remainingWallet: number;
-  totalBefore: number;
-  totalAfter: number;
-  onInitialCashChange: (value: string) => void;
-  onInitialBankChange: (value: string) => void;
-  onInitialWalletChange: (value: string) => void;
+  totalBalance: number;
 };
 
 function MoneySummaryCard({
-  initialCashText,
-  initialBankText,
-  initialWalletText,
   remainingCash,
   remainingBank,
   remainingWallet,
-  totalBefore,
-  totalAfter,
-  onInitialCashChange,
-  onInitialBankChange,
-  onInitialWalletChange,
+  totalBalance,
 }: MoneySummaryCardProps): React.JSX.Element {
   return (
     <View style={styles.card}>
-      <Text style={styles.sectionTitle}>الأرصدة الابتدائية</Text>
-
-      <View style={styles.compactFieldsRow}>
-        <View style={styles.compactField}>
-          <Text style={styles.label}>النقد المتوفر</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            keyboardType="numeric"
-            value={initialCashText}
-            onChangeText={onInitialCashChange}
-          />
-        </View>
-
-        <View style={styles.compactField}>
-          <Text style={styles.label}>رصيد البنك</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            keyboardType="numeric"
-            value={initialBankText}
-            onChangeText={onInitialBankChange}
-          />
-        </View>
-
-        <View style={styles.compactField}>
-          <Text style={styles.label}>رصيد المحفظة</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            keyboardType="numeric"
-            value={initialWalletText}
-            onChangeText={onInitialWalletChange}
-          />
-        </View>
-      </View>
-
-      <Text style={styles.sectionTitle}>الرصيد المتبقي لكل وسيلة</Text>
+      <Text style={styles.sectionTitle}>الأرصدة الحالية</Text>
 
       <View style={styles.moneySummaryRow}>
         <Text style={styles.moneySummaryValue}>{remainingCash.toFixed(2)} ج.م</Text>
@@ -85,19 +34,14 @@ function MoneySummaryCard({
       </View>
 
       <View style={styles.moneySummaryRow}>
-        <Text style={styles.moneySummaryValue}>{totalBefore.toFixed(2)} ج.م</Text>
-        <Text style={styles.moneySummaryLabel}>الإجمالي قبل الحركة</Text>
-      </View>
-
-      <View style={styles.moneySummaryRow}>
         <Text
           style={[
             styles.moneySummaryValue,
-            totalAfter < 0 ? styles.negativeValue : null,
+            totalBalance < 0 ? styles.negativeValue : null,
           ]}>
-          {totalAfter.toFixed(2)} ج.م
+          {totalBalance.toFixed(2)} ج.م
         </Text>
-        <Text style={styles.moneySummaryLabel}>الإجمالي بعد الحركة</Text>
+        <Text style={styles.moneySummaryLabel}>الإجمالي</Text>
       </View>
     </View>
   );
@@ -121,28 +65,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'right',
     marginBottom: 8,
-  },
-  label: {
-    color: '#334155',
-    textAlign: 'right',
-    fontSize: 14,
-  },
-  input: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#dbeafe',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#0f172a',
-  },
-  compactFieldsRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'flex-start',
-    gap: 8,
-  },
-  compactField: {
-    flex: 1,
   },
   moneySummaryRow: {
     flexDirection: 'row-reverse',

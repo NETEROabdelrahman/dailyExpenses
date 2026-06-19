@@ -4,11 +4,11 @@ import ExpensesTableCard from '../../components/ExpensesTableCard';
 import PageHeader from '../../components/PageHeader';
 import PieChartCard from '../../components/PieChartCard';
 import {Expense, PieDatum} from '../../types/expense';
-import {formatMonthLabel} from '../../utils/date';
 import styles from '../../styles/appStyles';
 
 type MonthDetailsPageProps = {
   selectedMonth: string | null;
+  selectedMonthLabel: string;
   totalSelectedMonthExpenses: number;
   selectedMonthExpenses: Expense[];
   pieDataSelectedMonth: PieDatum[];
@@ -19,6 +19,7 @@ type MonthDetailsPageProps = {
 
 function MonthDetailsPage({
   selectedMonth,
+  selectedMonthLabel,
   totalSelectedMonthExpenses,
   selectedMonthExpenses,
   pieDataSelectedMonth,
@@ -29,7 +30,7 @@ function MonthDetailsPage({
   return (
     <>
       <PageHeader
-        title={selectedMonth ? formatMonthLabel(selectedMonth) : ''}
+        title={selectedMonth ? selectedMonthLabel : ''}
         onBack={onBack}
       />
 

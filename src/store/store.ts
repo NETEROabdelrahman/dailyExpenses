@@ -14,13 +14,25 @@ import {
   REGISTER,
   REHYDRATE,
 } from 'redux-persist';
+import {AccountingPeriod, BalanceTransaction} from '../types/expense';
+import {formatPeriodLabel} from '../utils/date';
 import appReducer from './appSlice';
+
+const INITIAL_PERIOD_ID = 'period_1';
+
+const createInitialPeriod = (startedAtISO: string): AccountingPeriod => ({
+  id: INITIAL_PERIOD_ID,
+  label: formatPeriodLabel(startedAtISO),
+  startedAtISO,
+  endedAtISO: null,
+});
 
 type PersistedExpense = {
   id: string;
   name: string;
   amount: number;
   dateISO: string;
+  periodKey?: string;
   notes: string;
   category: string;
   paymentMethod?: 'cash' | 'bank' | 'wallet';
@@ -31,6 +43,7 @@ type PersistedDebtTransaction = {
   debtId: string;
   amount: number;
   dateISO: string;
+  periodKey?: string;
   paymentMethod?: 'cash' | 'bank' | 'wallet';
   type?: 'payment' | 'collection';
 };
@@ -55,6 +68,7 @@ type PersistedIncomingMoneyTransaction = {
   sourceType?: 'salary' | 'freelance' | 'gift' | 'refund' | 'other';
   sourceLabel?: string;
   dateISO: string;
+  periodKey?: string;
 };
 
 const rootReducer = combineReducers({
@@ -71,10 +85,17 @@ type PersistedRootState = ReturnType<typeof rootReducer> & {
     initialWalletText?: string;
     walletText?: string;
     incomingTransactions?: PersistedIncomingMoneyTransaction[];
+    balanceTransactions?: BalanceTransaction[];
+    periods?: AccountingPeriod[];
+    currentPeriodId?: string;
     customIncomingSources?: string[];
     incomingForm?: ReturnType<typeof appReducer>['incomingForm'] & {
       paymentMethod?: 'cash' | 'bank' | 'wallet';
       sourceType?: 'salary' | 'freelance' | 'gift' | 'refund' | 'other';
+    };
+    transferForm?: ReturnType<typeof appReducer>['transferForm'] & {
+      fromPaymentMethod?: 'cash' | 'bank' | 'wallet';
+      toPaymentMethod?: 'cash' | 'bank' | 'wallet';
     };
     form?: ReturnType<typeof appReducer>['form'] & {
       selectedPaymentMethod?: 'cash' | 'bank' | 'wallet';
@@ -314,11 +335,206 @@ const migrations: MigrationManifest = {
     nextState.app = nextApp;
     return nextState;
   },
+  6: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+
+    if (Array.isArray(nextApp.balanceTransactions)) {
+      nextState.app = nextApp;
+      return nextState;
+    }
+
+    const normalizePaymentMethod = (
+      paymentMethod?: 'cash' | 'bank' | 'wallet',
+    ) => {
+      if (paymentMethod === 'bank' || paymentMethod === 'wallet') {
+        return paymentMethod;
+      }
+
+      return 'cash';
+    };
+
+    const balanceTransactions: BalanceTransaction[] = [];
+
+    if (Array.isArray(nextApp.expenses)) {
+      nextApp.expenses.forEach(expense => {
+        balanceTransactions.push({
+          id: `migration_balance_expense_${expense.id}`,
+          type: 'expense',
+          paymentMethod: normalizePaymentMethod(expense.paymentMethod),
+          amount: -expense.amount,
+          dateISO: expense.dateISO,
+          periodKey: expense.periodKey ?? INITIAL_PERIOD_ID,
+          title: expense.name,
+          sourceType: 'expense',
+          sourceId: expense.id,
+        });
+      });
+    }
+
+    if (Array.isArray(nextApp.incomingTransactions)) {
+      nextApp.incomingTransactions.forEach(transaction => {
+        balanceTransactions.push({
+          id: `migration_balance_incoming_${transaction.id}`,
+          type: 'incoming',
+          paymentMethod: normalizePaymentMethod(transaction.paymentMethod),
+          amount: transaction.amount,
+          dateISO: transaction.dateISO,
+          periodKey: transaction.periodKey ?? INITIAL_PERIOD_ID,
+          title: transaction.sourceLabel || transaction.sourceType || 'incoming',
+          sourceType: 'incoming',
+          sourceId: transaction.id,
+        });
+      });
+    }
+
+    if (Array.isArray(nextApp.debts)) {
+      nextApp.debts.forEach(debt => {
+        const transactions = Array.isArray(debt.transactions) ? debt.transactions : [];
+
+        transactions.forEach(transaction => {
+          const isCollection = transaction.type === 'collection';
+
+          balanceTransactions.push({
+            id: `migration_balance_debt_${transaction.id}`,
+            type: isCollection ? 'debtCollection' : 'debtPayment',
+            paymentMethod: normalizePaymentMethod(transaction.paymentMethod),
+            amount: isCollection ? transaction.amount : -transaction.amount,
+            dateISO: transaction.dateISO,
+            periodKey: transaction.periodKey ?? INITIAL_PERIOD_ID,
+            title: debt.personName,
+            sourceType: 'debtTransaction',
+            sourceId: transaction.id,
+            debtId: debt.id,
+          });
+        });
+      });
+    }
+
+    nextApp.balanceTransactions = balanceTransactions.sort((first, second) =>
+      second.dateISO.localeCompare(first.dateISO),
+    );
+
+    nextState.app = nextApp;
+    return nextState;
+  },
+  7: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+    const startedAtISO = new Date().toISOString();
+
+    if (!Array.isArray(nextApp.periods) || nextApp.periods.length === 0) {
+      nextApp.periods = [createInitialPeriod(startedAtISO)];
+    }
+
+    if (!nextApp.currentPeriodId) {
+      const activePeriod = nextApp.periods.find(period => period.endedAtISO === null);
+      nextApp.currentPeriodId = activePeriod?.id ?? INITIAL_PERIOD_ID;
+    }
+
+    if (Array.isArray(nextApp.expenses)) {
+      nextApp.expenses = nextApp.expenses.map(expense => ({
+        ...expense,
+        periodKey: expense.periodKey ?? nextApp.currentPeriodId ?? INITIAL_PERIOD_ID,
+      }));
+    }
+
+    if (Array.isArray(nextApp.incomingTransactions)) {
+      nextApp.incomingTransactions = nextApp.incomingTransactions.map(transaction => ({
+        ...transaction,
+        periodKey: transaction.periodKey ?? nextApp.currentPeriodId ?? INITIAL_PERIOD_ID,
+      }));
+    }
+
+    if (Array.isArray(nextApp.debts)) {
+      nextApp.debts = nextApp.debts.map(debt => ({
+        ...debt,
+        transactions: Array.isArray(debt.transactions)
+          ? debt.transactions.map(transaction => ({
+              ...transaction,
+              periodKey: transaction.periodKey ?? nextApp.currentPeriodId ?? INITIAL_PERIOD_ID,
+            }))
+          : [],
+      }));
+    }
+
+    if (Array.isArray(nextApp.balanceTransactions)) {
+      nextApp.balanceTransactions = nextApp.balanceTransactions.map(transaction => ({
+        ...transaction,
+        periodKey: transaction.periodKey ?? nextApp.currentPeriodId ?? INITIAL_PERIOD_ID,
+      }));
+    }
+
+    nextState.app = nextApp;
+    return nextState;
+  },
+  8: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+
+    const normalizePaymentMethod = (
+      paymentMethod?: 'cash' | 'bank' | 'wallet',
+      fallback: 'cash' | 'bank' | 'wallet' = 'cash',
+    ) => {
+      if (
+        paymentMethod === 'cash' ||
+        paymentMethod === 'bank' ||
+        paymentMethod === 'wallet'
+      ) {
+        return paymentMethod;
+      }
+
+      return fallback;
+    };
+
+    nextApp.transferForm = {
+      amountText: nextApp.transferForm?.amountText ?? '',
+      fromPaymentMethod: normalizePaymentMethod(
+        nextApp.transferForm?.fromPaymentMethod,
+        'wallet',
+      ),
+      toPaymentMethod: normalizePaymentMethod(
+        nextApp.transferForm?.toPaymentMethod,
+        'cash',
+      ),
+      notes: nextApp.transferForm?.notes ?? '',
+    };
+
+    nextState.app = nextApp;
+    return nextState;
+  },
 };
 
 const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: 'root',
-  version: 5,
+  version: 8,
   storage: AsyncStorage,
   whitelist: ['app'],
   migrate: createMigrate(migrations, {debug: false}),

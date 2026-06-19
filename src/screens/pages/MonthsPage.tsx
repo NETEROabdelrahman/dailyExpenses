@@ -1,18 +1,19 @@
 import React from 'react';
 import MonthsListCard from '../../components/MonthsListCard';
 import PageHeader from '../../components/PageHeader';
+import {AccountingPeriod} from '../../types/expense';
 
 type MonthsPageProps = {
-  months: string[];
+  periods: AccountingPeriod[];
   onBack: () => void;
-  onSelectMonth: (monthKey: string) => void;
+  onSelectMonth: (periodId: string) => void;
 };
 
-function MonthsPage({months, onBack, onSelectMonth}: MonthsPageProps): React.JSX.Element {
+function MonthsPage({periods, onBack, onSelectMonth}: MonthsPageProps): React.JSX.Element {
   return (
     <>
       <PageHeader title="الشهور السابقة" onBack={onBack} />
-      <MonthsListCard months={months} onSelectMonth={onSelectMonth} />
+      <MonthsListCard periods={periods} onSelectMonth={onSelectMonth} />
     </>
   );
 }

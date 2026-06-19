@@ -9,6 +9,12 @@ export const formatMonthLabel = (monthKey: string) =>
     year: 'numeric',
   });
 
+export const formatPeriodLabel = (startedAtISO: string) =>
+  new Date(startedAtISO).toLocaleDateString('ar-EG', {
+    month: 'long',
+    year: 'numeric',
+  });
+
 export const currentMonthKey = () => toMonthKey(new Date().toISOString());
 
 export const normalizedDateISO = (date: Date) => {

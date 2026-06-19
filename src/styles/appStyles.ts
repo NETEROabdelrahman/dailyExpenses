@@ -20,6 +20,18 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 6,
   },
+  periodHeaderRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  endMonthBtn: {
+    backgroundColor: '#0f766e',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   topMenuContainer: {
     position: 'relative',
     zIndex: 10,
@@ -99,6 +111,44 @@ const styles = StyleSheet.create({
   totalValue: {
     color: '#0c4a6e',
     fontSize: 30,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  periodMetaText: {
+    color: '#64748b',
+    fontSize: 12,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  monthSummaryCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
+    padding: 14,
+    gap: 8,
+  },
+  summaryGrid: {
+    flexDirection: 'row-reverse',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  summaryItem: {
+    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    padding: 10,
+    minWidth: '47%',
+    flex: 1,
+    gap: 4,
+  },
+  summaryLabel: {
+    color: '#475569',
+    fontSize: 12,
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  summaryValue: {
+    color: '#0f766e',
     fontWeight: '700',
     textAlign: 'right',
   },

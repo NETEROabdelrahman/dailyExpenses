@@ -1,7 +1,10 @@
 import {createSlice, PayloadAction} from '@reduxjs/toolkit';
 import {DEFAULT_CATEGORIES} from '../constants/appConstants';
 import {
+  AccountingPeriod,
   AppPage,
+  BalanceTransaction,
+  BalanceTransactionSourceType,
   Debt,
   DebtDirection,
   DebtStatus,
@@ -11,12 +14,15 @@ import {
   IncomingMoneyTransaction,
   PaymentMethod,
 } from '../types/expense';
-import {normalizedDateISO} from '../utils/date';
+import {formatPeriodLabel, normalizedDateISO} from '../utils/date';
 
 type AppState = {
   expenses: Expense[];
   debts: Debt[];
+  balanceTransactions: BalanceTransaction[];
   incomingTransactions: IncomingMoneyTransaction[];
+  periods: AccountingPeriod[];
+  currentPeriodId: string;
   customIncomingSources: string[];
   categories: string[];
   initialCashText: string;
@@ -56,16 +62,32 @@ type AppState = {
     sourceType: IncomingMoneySourceType;
     sourceOtherText: string;
   };
+  transferForm: {
+    amountText: string;
+    fromPaymentMethod: PaymentMethod;
+    toPaymentMethod: PaymentMethod;
+    notes: string;
+  };
 };
 
 const DEFAULT_PAYMENT_METHOD: PaymentMethod = 'cash';
+const DEFAULT_TRANSFER_FROM_PAYMENT_METHOD: PaymentMethod = 'wallet';
+const DEFAULT_TRANSFER_TO_PAYMENT_METHOD: PaymentMethod = 'cash';
 const DEFAULT_DEBT_DIRECTION: DebtDirection = 'owe';
 const DEFAULT_INCOMING_SOURCE: IncomingMoneySourceType = 'salary';
+const FIRST_PERIOD_ID = 'period_1';
 
-const toNumber = (value: string): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-};
+const roundMoney = (value: number): number => Math.round(value * 100) / 100;
+
+const createId = (prefix: string): string =>
+  `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+const createPeriod = (index: number, startedAtISO: string): AccountingPeriod => ({
+  id: `period_${index}`,
+  label: formatPeriodLabel(startedAtISO),
+  startedAtISO,
+  endedAtISO: null,
+});
 
 const normalizePaymentMethod = (
   paymentMethod?: Expense['paymentMethod'],
@@ -74,6 +96,18 @@ const normalizePaymentMethod = (
     return paymentMethod;
   }
   return DEFAULT_PAYMENT_METHOD;
+};
+
+const getPaymentMethodLabel = (paymentMethod: PaymentMethod): string => {
+  if (paymentMethod === 'cash') {
+    return 'النقد';
+  }
+
+  if (paymentMethod === 'bank') {
+    return 'البنك';
+  }
+
+  return 'المحفظة';
 };
 
 const normalizeDebtDirection = (direction?: DebtDirection): DebtDirection => {
@@ -115,42 +149,112 @@ const computeDebtStatus = (dueDateISO: string, remainingAmount: number): DebtSta
 };
 
 const getBalanceValue = (state: AppState, paymentMethod: PaymentMethod): number => {
-  if (paymentMethod === 'cash') {
-    return toNumber(state.cashText);
-  }
+  const ledgerBalance = (state.balanceTransactions ?? []).reduce((sum, item) => {
+    if (normalizePaymentMethod(item.paymentMethod) !== paymentMethod) {
+      return sum;
+    }
 
-  if (paymentMethod === 'bank') {
-    return toNumber(state.bankText);
-  }
+    return sum + item.amount;
+  }, 0);
 
-  return toNumber(state.walletText);
+  return roundMoney(ledgerBalance);
 };
 
-const setBalanceValue = (state: AppState, paymentMethod: PaymentMethod, value: number) => {
-  const normalizedValue = String(Math.round(value * 100) / 100);
+const getBalanceValueWithoutSource = (
+  state: AppState,
+  paymentMethod: PaymentMethod,
+  sourceType: BalanceTransactionSourceType,
+  sourceId: string,
+): number => {
+  const ledgerBalance = (state.balanceTransactions ?? []).reduce((sum, item) => {
+    if (normalizePaymentMethod(item.paymentMethod) !== paymentMethod) {
+      return sum;
+    }
 
-  if (paymentMethod === 'cash') {
-    state.cashText = normalizedValue;
-    return;
-  }
+    if (item.sourceType === sourceType && item.sourceId === sourceId) {
+      return sum;
+    }
 
-  if (paymentMethod === 'bank') {
-    state.bankText = normalizedValue;
-    return;
-  }
+    return sum + item.amount;
+  }, 0);
 
-  state.walletText = normalizedValue;
+  return roundMoney(ledgerBalance);
 };
 
-const adjustBalance = (state: AppState, paymentMethod: PaymentMethod, delta: number) => {
-  const current = getBalanceValue(state, paymentMethod);
-  setBalanceValue(state, paymentMethod, current + delta);
+const syncBalanceTexts = (state: AppState) => {
+  state.cashText = String(getBalanceValue(state, 'cash'));
+  state.bankText = String(getBalanceValue(state, 'bank'));
+  state.walletText = String(getBalanceValue(state, 'wallet'));
+};
+
+const addBalanceTransaction = (
+  state: AppState,
+  transaction: BalanceTransaction,
+) => {
+  state.balanceTransactions = [transaction, ...(state.balanceTransactions ?? [])];
+  syncBalanceTexts(state);
+};
+
+const removeBalanceTransactionsBySource = (
+  state: AppState,
+  sourceType: BalanceTransactionSourceType,
+  sourceId: string,
+) => {
+  state.balanceTransactions = (state.balanceTransactions ?? []).filter(
+    item => item.sourceType !== sourceType || item.sourceId !== sourceId,
+  );
+  syncBalanceTexts(state);
+};
+
+const removeBalanceTransactionsByDebtId = (state: AppState, debtId: string) => {
+  state.balanceTransactions = (state.balanceTransactions ?? []).filter(
+    item => item.debtId !== debtId,
+  );
+  syncBalanceTexts(state);
+};
+
+const ensureBalanceLedgerRuntimeState = (state: AppState) => {
+  if (!Array.isArray(state.balanceTransactions)) {
+    state.balanceTransactions = [];
+  }
+
+  syncBalanceTexts(state);
+};
+
+const ensurePeriodRuntimeState = (state: AppState) => {
+  if (!Array.isArray(state.periods) || state.periods.length === 0) {
+    state.periods = [createPeriod(1, new Date().toISOString())];
+  }
+
+  const currentPeriodExists = state.periods.some(
+    period => period.id === state.currentPeriodId && period.endedAtISO === null,
+  );
+
+  if (!state.currentPeriodId || !currentPeriodExists) {
+    const activePeriod = state.periods.find(period => period.endedAtISO === null);
+    if (activePeriod) {
+      state.currentPeriodId = activePeriod.id;
+      return;
+    }
+
+    const nextPeriod = createPeriod(state.periods.length + 1, new Date().toISOString());
+    state.periods = [nextPeriod, ...state.periods];
+    state.currentPeriodId = nextPeriod.id;
+  }
+};
+
+const getCurrentPeriodId = (state: AppState): string => {
+  ensurePeriodRuntimeState(state);
+  return state.currentPeriodId;
 };
 
 const createInitialState = (): AppState => ({
   expenses: [],
   debts: [],
+  balanceTransactions: [],
   incomingTransactions: [],
+  periods: [createPeriod(1, new Date().toISOString())],
+  currentPeriodId: FIRST_PERIOD_ID,
   customIncomingSources: [],
   categories: DEFAULT_CATEGORIES,
   initialCashText: '',
@@ -189,6 +293,12 @@ const createInitialState = (): AppState => ({
     paymentMethod: DEFAULT_PAYMENT_METHOD,
     sourceType: DEFAULT_INCOMING_SOURCE,
     sourceOtherText: '',
+  },
+  transferForm: {
+    amountText: '',
+    fromPaymentMethod: DEFAULT_TRANSFER_FROM_PAYMENT_METHOD,
+    toPaymentMethod: DEFAULT_TRANSFER_TO_PAYMENT_METHOD,
+    notes: '',
   },
 });
 
@@ -234,6 +344,8 @@ const resetDebtFormValues = (state: AppState) => {
 };
 
 const ensureDebtRuntimeState = (state: AppState) => {
+  ensureBalanceLedgerRuntimeState(state);
+
   if (!state.debtForm) {
     state.debtForm = {
       personName: '',
@@ -255,6 +367,8 @@ const ensureDebtRuntimeState = (state: AppState) => {
 };
 
 const ensureIncomingRuntimeState = (state: AppState) => {
+  ensureBalanceLedgerRuntimeState(state);
+
   if (!state.incomingForm) {
     state.incomingForm = {
       amountText: '',
@@ -270,6 +384,20 @@ const ensureIncomingRuntimeState = (state: AppState) => {
 
   if (!Array.isArray(state.customIncomingSources)) {
     state.customIncomingSources = [];
+  }
+};
+
+const ensureTransferRuntimeState = (state: AppState) => {
+  ensureBalanceLedgerRuntimeState(state);
+  ensurePeriodRuntimeState(state);
+
+  if (!state.transferForm) {
+    state.transferForm = {
+      amountText: '',
+      fromPaymentMethod: DEFAULT_TRANSFER_FROM_PAYMENT_METHOD,
+      toPaymentMethod: DEFAULT_TRANSFER_TO_PAYMENT_METHOD,
+      notes: '',
+    };
   }
 };
 
@@ -300,15 +428,15 @@ const appSlice = createSlice({
     },
     setInitialCashText(state, action: PayloadAction<string>) {
       state.initialCashText = action.payload;
-      state.cashText = action.payload;
+      ensureBalanceLedgerRuntimeState(state);
     },
     setInitialBankText(state, action: PayloadAction<string>) {
       state.initialBankText = action.payload;
-      state.bankText = action.payload;
+      ensureBalanceLedgerRuntimeState(state);
     },
     setInitialWalletText(state, action: PayloadAction<string>) {
       state.initialWalletText = action.payload;
-      state.walletText = action.payload;
+      ensureBalanceLedgerRuntimeState(state);
     },
     setCashText(state, action: PayloadAction<string>) {
       state.cashText = action.payload;
@@ -377,6 +505,22 @@ const appSlice = createSlice({
       ensureIncomingRuntimeState(state);
       state.incomingForm.sourceOtherText = action.payload;
     },
+    setTransferAmountText(state, action: PayloadAction<string>) {
+      ensureTransferRuntimeState(state);
+      state.transferForm.amountText = action.payload;
+    },
+    setTransferFromPaymentMethod(state, action: PayloadAction<PaymentMethod>) {
+      ensureTransferRuntimeState(state);
+      state.transferForm.fromPaymentMethod = normalizePaymentMethod(action.payload);
+    },
+    setTransferToPaymentMethod(state, action: PayloadAction<PaymentMethod>) {
+      ensureTransferRuntimeState(state);
+      state.transferForm.toPaymentMethod = normalizePaymentMethod(action.payload);
+    },
+    setTransferNotes(state, action: PayloadAction<string>) {
+      ensureTransferRuntimeState(state);
+      state.transferForm.notes = action.payload;
+    },
     addIncomingCustomSourceFromForm(state) {
       ensureIncomingRuntimeState(state);
       const cleanLabel = state.incomingForm.sourceOtherText.trim();
@@ -413,6 +557,13 @@ const appSlice = createSlice({
       state.incomingForm.sourceType = DEFAULT_INCOMING_SOURCE;
       state.incomingForm.sourceOtherText = '';
     },
+    resetTransferForm(state) {
+      ensureTransferRuntimeState(state);
+      state.transferForm.amountText = '';
+      state.transferForm.fromPaymentMethod = DEFAULT_TRANSFER_FROM_PAYMENT_METHOD;
+      state.transferForm.toPaymentMethod = DEFAULT_TRANSFER_TO_PAYMENT_METHOD;
+      state.transferForm.notes = '';
+    },
     addCategoryFromForm(state) {
       const clean = state.form.newCategory.trim();
       if (!clean || state.categories.includes(clean)) {
@@ -424,6 +575,8 @@ const appSlice = createSlice({
       state.form.newCategory = '';
     },
     saveExpenseFromForm(state) {
+      ensureBalanceLedgerRuntimeState(state);
+      const activePeriodId = getCurrentPeriodId(state);
       const cleanName = state.form.name.trim();
       const amount = Number(state.form.amountText);
       const dateISO = normalizedDateISO(new Date(state.form.expenseDateISO));
@@ -444,18 +597,18 @@ const appSlice = createSlice({
           return;
         }
 
-        const currentPaymentMethod = normalizePaymentMethod(currentExpense.paymentMethod);
-
-        // Restore old amount before applying edited amount/method.
-        adjustBalance(state, currentPaymentMethod, currentExpense.amount);
-
-        if (getBalanceValue(state, selectedPaymentMethod) < amount) {
-          // Keep state unchanged when edited amount cannot be covered.
-          adjustBalance(state, currentPaymentMethod, -currentExpense.amount);
+        if (
+          getBalanceValueWithoutSource(
+            state,
+            selectedPaymentMethod,
+            'expense',
+            currentExpense.id,
+          ) < amount
+        ) {
           return;
         }
 
-        adjustBalance(state, selectedPaymentMethod, -amount);
+        const periodKey = currentExpense.periodKey ?? activePeriodId;
 
         state.expenses = state.expenses.map(item => {
           if (item.id !== state.form.editingExpenseId) {
@@ -467,10 +620,23 @@ const appSlice = createSlice({
             name: cleanName,
             amount,
             dateISO,
+            periodKey,
             notes: state.form.notes.trim(),
             category: state.form.selectedCategory,
             paymentMethod: selectedPaymentMethod,
           };
+        });
+        removeBalanceTransactionsBySource(state, 'expense', currentExpense.id);
+        addBalanceTransaction(state, {
+          id: createId('balance'),
+          type: 'expense',
+          paymentMethod: selectedPaymentMethod,
+          amount: -amount,
+          dateISO,
+          periodKey,
+          title: cleanName,
+          sourceType: 'expense',
+          sourceId: currentExpense.id,
         });
         resetFormValues(state);
         return;
@@ -480,19 +646,31 @@ const appSlice = createSlice({
         return;
       }
 
-      adjustBalance(state, selectedPaymentMethod, -amount);
+      const expenseId = createId('expense');
 
       const expense: Expense = {
-        id: `${Date.now()}`,
+        id: expenseId,
         name: cleanName,
         amount,
         dateISO,
+        periodKey: activePeriodId,
         notes: state.form.notes.trim(),
         category: state.form.selectedCategory,
         paymentMethod: selectedPaymentMethod,
       };
 
       state.expenses = [expense, ...state.expenses];
+      addBalanceTransaction(state, {
+        id: createId('balance'),
+        type: 'expense',
+        paymentMethod: selectedPaymentMethod,
+        amount: -amount,
+        dateISO,
+        periodKey: activePeriodId,
+        title: cleanName,
+        sourceType: 'expense',
+        sourceId: expenseId,
+      });
       resetFormValues(state);
     },
     saveDebtFromForm(state) {
@@ -507,7 +685,7 @@ const appSlice = createSlice({
       }
 
       const debt: Debt = {
-        id: `${Date.now()}`,
+        id: createId('debt'),
         personName,
         totalAmount,
         remainingAmount: totalAmount,
@@ -525,6 +703,7 @@ const appSlice = createSlice({
     },
     saveDebtTransactionFromForm(state) {
       ensureDebtRuntimeState(state);
+      const activePeriodId = getCurrentPeriodId(state);
       const debtId = state.debtTransactionForm.selectedDebtId;
       const amount = Number(state.debtTransactionForm.amountText);
       const paymentMethod = normalizePaymentMethod(state.debtTransactionForm.paymentMethod);
@@ -544,21 +723,17 @@ const appSlice = createSlice({
       const transactionType: DebtTransaction['type'] =
         direction === 'owe' ? 'payment' : 'collection';
 
-      if (direction === 'owe') {
-        if (getBalanceValue(state, paymentMethod) < amount) {
-          return;
-        }
-
-        adjustBalance(state, paymentMethod, -amount);
-      } else {
-        adjustBalance(state, paymentMethod, amount);
+      if (direction === 'owe' && getBalanceValue(state, paymentMethod) < amount) {
+        return;
       }
 
+      const transactionId = createId('debt_tx');
       const transaction: DebtTransaction = {
-        id: `${Date.now()}_${Math.random()}`,
+        id: transactionId,
         debtId,
         amount,
         dateISO,
+        periodKey: activePeriodId,
         paymentMethod,
         type: transactionType,
       };
@@ -578,11 +753,25 @@ const appSlice = createSlice({
         };
       });
 
+      addBalanceTransaction(state, {
+        id: createId('balance'),
+        type: direction === 'owe' ? 'debtPayment' : 'debtCollection',
+        paymentMethod,
+        amount: direction === 'owe' ? -amount : amount,
+        dateISO,
+        periodKey: activePeriodId,
+        title: debt.personName,
+        sourceType: 'debtTransaction',
+        sourceId: transactionId,
+        debtId,
+      });
+
       state.debtTransactionForm.amountText = '';
       state.debtTransactionForm.transactionDateISO = new Date().toISOString();
     },
     saveIncomingFromForm(state) {
       ensureIncomingRuntimeState(state);
+      const activePeriodId = getCurrentPeriodId(state);
       const amount = Number(state.incomingForm.amountText);
       const paymentMethod = normalizePaymentMethod(state.incomingForm.paymentMethod);
       const sourceType = normalizeIncomingSourceType(state.incomingForm.sourceType);
@@ -596,20 +785,31 @@ const appSlice = createSlice({
         return;
       }
 
-      adjustBalance(state, paymentMethod, amount);
-
       const sourceLabel = sourceType === 'other' ? otherLabel : sourceType;
+      const transactionId = createId('incoming');
 
       const transaction: IncomingMoneyTransaction = {
-        id: `${Date.now()}_${Math.random()}`,
+        id: transactionId,
         amount,
         paymentMethod,
         sourceType,
         sourceLabel,
         dateISO: new Date().toISOString(),
+        periodKey: activePeriodId,
       };
 
       state.incomingTransactions = [transaction, ...state.incomingTransactions];
+      addBalanceTransaction(state, {
+        id: createId('balance'),
+        type: 'incoming',
+        paymentMethod,
+        amount,
+        dateISO: transaction.dateISO,
+        periodKey: activePeriodId,
+        title: sourceLabel,
+        sourceType: 'incoming',
+        sourceId: transactionId,
+      });
       state.incomingForm.amountText = '';
       state.incomingForm.sourceOtherText = '';
     },
@@ -622,10 +822,67 @@ const appSlice = createSlice({
         return;
       }
 
-      adjustBalance(state, transaction.paymentMethod, -transaction.amount);
       state.incomingTransactions = state.incomingTransactions.filter(
         item => item.id !== transactionId,
       );
+      removeBalanceTransactionsBySource(state, 'incoming', transactionId);
+    },
+    saveTransferFromForm(state) {
+      ensureTransferRuntimeState(state);
+      const activePeriodId = getCurrentPeriodId(state);
+      const amount = Number(state.transferForm.amountText);
+      const fromPaymentMethod = normalizePaymentMethod(
+        state.transferForm.fromPaymentMethod,
+      );
+      const toPaymentMethod = normalizePaymentMethod(
+        state.transferForm.toPaymentMethod,
+      );
+
+      if (
+        !Number.isFinite(amount) ||
+        amount <= 0 ||
+        fromPaymentMethod === toPaymentMethod
+      ) {
+        return;
+      }
+
+      if (getBalanceValue(state, fromPaymentMethod) < amount) {
+        return;
+      }
+
+      const transferId = createId('transfer');
+      const dateISO = new Date().toISOString();
+      const cleanNotes = state.transferForm.notes.trim();
+      const fromLabel = getPaymentMethodLabel(fromPaymentMethod);
+      const toLabel = getPaymentMethodLabel(toPaymentMethod);
+      const titleSuffix = cleanNotes ? ` - ${cleanNotes}` : '';
+
+      addBalanceTransaction(state, {
+        id: createId('balance'),
+        type: 'transferOut',
+        paymentMethod: fromPaymentMethod,
+        amount: -amount,
+        dateISO,
+        periodKey: activePeriodId,
+        title: `تحويل إلى ${toLabel}${titleSuffix}`,
+        sourceType: 'balanceTransfer',
+        sourceId: transferId,
+      });
+
+      addBalanceTransaction(state, {
+        id: createId('balance'),
+        type: 'transferIn',
+        paymentMethod: toPaymentMethod,
+        amount,
+        dateISO,
+        periodKey: activePeriodId,
+        title: `تحويل من ${fromLabel}${titleSuffix}`,
+        sourceType: 'balanceTransfer',
+        sourceId: transferId,
+      });
+
+      state.transferForm.amountText = '';
+      state.transferForm.notes = '';
     },
     deleteDebt(state, action: PayloadAction<string>) {
       const debtId = action.payload;
@@ -635,16 +892,8 @@ const appSlice = createSlice({
         return;
       }
 
-      debt.transactions.forEach(transaction => {
-        if (transaction.type === 'payment') {
-          adjustBalance(state, transaction.paymentMethod, transaction.amount);
-          return;
-        }
-
-        adjustBalance(state, transaction.paymentMethod, -transaction.amount);
-      });
-
       state.debts = state.debts.filter(item => item.id !== debtId);
+      removeBalanceTransactionsByDebtId(state, debtId);
 
       if (state.debtTransactionForm.selectedDebtId === debtId) {
         state.debtTransactionForm.selectedDebtId = state.debts[0]?.id ?? null;
@@ -665,15 +914,10 @@ const appSlice = createSlice({
       const expenseId = action.payload;
       const deletedExpense = state.expenses.find(item => item.id === expenseId);
 
-      if (deletedExpense) {
-        adjustBalance(
-          state,
-          normalizePaymentMethod(deletedExpense.paymentMethod),
-          deletedExpense.amount,
-        );
-      }
-
       state.expenses = state.expenses.filter(item => item.id !== expenseId);
+      if (deletedExpense) {
+        removeBalanceTransactionsBySource(state, 'expense', expenseId);
+      }
 
       if (state.form.editingExpenseId === expenseId) {
         resetFormValues(state);
@@ -682,6 +926,27 @@ const appSlice = createSlice({
     openMonthDetails(state, action: PayloadAction<string>) {
       state.selectedMonth = action.payload;
       state.page = 'monthDetails';
+    },
+    endCurrentMonth(state) {
+      ensurePeriodRuntimeState(state);
+      const endedAtISO = new Date().toISOString();
+      const currentPeriodId = state.currentPeriodId;
+
+      state.periods = state.periods.map(period => {
+        if (period.id !== currentPeriodId) {
+          return period;
+        }
+
+        return {
+          ...period,
+          endedAtISO,
+        };
+      });
+
+      const nextPeriod = createPeriod(state.periods.length + 1, endedAtISO);
+      state.periods = [nextPeriod, ...state.periods];
+      state.currentPeriodId = nextPeriod.id;
+      state.selectedMonth = currentPeriodId;
     },
   },
 });
@@ -692,14 +957,17 @@ export const {
   deleteIncomingTransaction,
   deleteDebt,
   deleteExpense,
+  endCurrentMonth,
   openMonthDetails,
   resetForm,
   resetDebtForms,
   resetIncomingForm,
+  resetTransferForm,
   saveDebtFromForm,
   saveIncomingFromForm,
   saveDebtTransactionFromForm,
   saveExpenseFromForm,
+  saveTransferFromForm,
   setAmountText,
   setBankText,
   setCashText,
@@ -717,6 +985,10 @@ export const {
   setIncomingPaymentMethod,
   setIncomingSourceOtherText,
   setIncomingSourceType,
+  setTransferAmountText,
+  setTransferFromPaymentMethod,
+  setTransferNotes,
+  setTransferToPaymentMethod,
   setInitialBankText,
   setInitialCashText,
   setInitialWalletText,

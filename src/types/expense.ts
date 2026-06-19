@@ -3,6 +3,7 @@ export type Expense = {
   name: string;
   amount: number;
   dateISO: string;
+  periodKey: string;
   notes: string;
   category: string;
   paymentMethod: PaymentMethod;
@@ -24,6 +25,36 @@ export type IncomingMoneyTransaction = {
   sourceType: IncomingMoneySourceType;
   sourceLabel: string;
   dateISO: string;
+  periodKey: string;
+};
+
+export type BalanceTransactionType =
+  | 'expense'
+  | 'incoming'
+  | 'debtPayment'
+  | 'debtCollection'
+  | 'transferOut'
+  | 'transferIn'
+  | 'manualAdjustment';
+
+export type BalanceTransactionSourceType =
+  | 'expense'
+  | 'incoming'
+  | 'debtTransaction'
+  | 'balanceTransfer'
+  | 'manualAdjustment';
+
+export type BalanceTransaction = {
+  id: string;
+  type: BalanceTransactionType;
+  paymentMethod: PaymentMethod;
+  amount: number;
+  dateISO: string;
+  periodKey: string;
+  title: string;
+  sourceType: BalanceTransactionSourceType;
+  sourceId: string;
+  debtId?: string;
 };
 
 export type DebtDirection = 'owe' | 'owedToMe';
@@ -37,8 +68,16 @@ export type DebtTransaction = {
   debtId: string;
   amount: number;
   dateISO: string;
+  periodKey: string;
   paymentMethod: PaymentMethod;
   type: DebtTransactionType;
+};
+
+export type AccountingPeriod = {
+  id: string;
+  label: string;
+  startedAtISO: string;
+  endedAtISO: string | null;
 };
 
 export type Debt = {

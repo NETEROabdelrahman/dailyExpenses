@@ -79,7 +79,7 @@ android {
 
     namespace "com.dailyexpenses"
     defaultConfig {
-        applicationId "com.dailyexpenses"
+        applicationId "com.daily"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
