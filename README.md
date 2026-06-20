@@ -101,14 +101,14 @@ To learn more about React Native, take a look at the following resources:
 This repository includes a root `codemagic.yaml` with Codemagic workflows for Android and iOS:
 
 - `android-debug` builds a debug APK.
-- `android-release` builds a signed release AAB.
+- `android-release` builds a signed release APK.
 - `ios-release` builds a signed release IPA.
 
 To use the release workflow on Codemagic:
 
 1. Upload your Android keystore in Codemagic and set its reference name to `daily_keystore`, or update the reference in `codemagic.yaml`.
 2. Click **Check for configuration files** in Codemagic after pushing the file.
-3. Run the `android-release` workflow to generate a signed `.aab`.
+3. Run the `android-release` workflow to generate a signed `.apk`.
 
 The Android Gradle config is set up to read Codemagic signing variables on CI:
 

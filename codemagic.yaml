@@ -46,12 +46,11 @@ workflows:
         script: npm run lint
       - name: Test
         script: npm test -- --runInBand
-      - name: Build release bundle
+      - name: Build release APK
         script: |
           cd android
-          ./gradlew bundleRelease
+          ./gradlew assembleRelease
     artifacts:
-      - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/*.apk
       - android/app/build/outputs/mapping/**/mapping.txt
 
