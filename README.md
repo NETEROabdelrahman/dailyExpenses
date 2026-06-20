@@ -98,10 +98,11 @@ To learn more about React Native, take a look at the following resources:
 
 ## Codemagic
 
-This repository includes a root `codemagic.yaml` with two Android workflows:
+This repository includes a root `codemagic.yaml` with Codemagic workflows for Android and iOS:
 
 - `android-debug` builds a debug APK.
 - `android-release` builds a signed release AAB.
+- `ios-release` builds a signed release IPA.
 
 To use the release workflow on Codemagic:
 
@@ -115,3 +116,15 @@ The Android Gradle config is set up to read Codemagic signing variables on CI:
 - `CM_KEYSTORE_PASSWORD`
 - `CM_KEY_ALIAS`
 - `CM_KEY_PASSWORD`
+
+For the iOS workflow, configure Apple signing in Codemagic before running `ios-release`:
+
+1. Add an App Store Connect API key in Codemagic Team settings > Team integrations > Developer Portal.
+2. Upload or fetch a matching iOS distribution certificate in codemagic.yaml settings > Code signing identities > iOS certificates.
+3. Upload or fetch an App Store provisioning profile for bundle id `com.daily` in codemagic.yaml settings > Code signing identities > iOS provisioning profiles.
+
+The `ios-release` workflow uses:
+
+- bundle identifier: `com.daily`
+- Xcode workspace: `ios/DailyExpenses.xcworkspace`
+- Xcode scheme: `DailyExpenses`

@@ -11,6 +11,8 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm ci
+      - name: Make Gradle wrapper executable
+        script: chmod +x android/gradlew
       - name: Lint
         script: npm run lint
       - name: Test
@@ -38,6 +40,8 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm ci
+      - name: Make Gradle wrapper executable
+        script: chmod +x android/gradlew
       - name: Lint
         script: npm run lint
       - name: Test
@@ -50,3 +54,40 @@ workflows:
       - android/app/build/outputs/**/*.aab
       - android/app/build/outputs/**/*.apk
       - android/app/build/outputs/mapping/**/mapping.txt
+
+  ios-release:
+    name: Daily iOS Release
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.daily
+      vars:
+        XCODE_WORKSPACE: "ios/DailyExpenses.xcworkspace"
+        XCODE_SCHEME: "DailyExpenses"
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/Library/Caches/CocoaPods
+        - $CM_BUILD_DIR/node_modules
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Install Ruby gems
+        script: bundle install
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          bundle exec pod install
+      - name: Apply provisioning profiles
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
