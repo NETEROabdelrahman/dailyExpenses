@@ -32,6 +32,14 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
 
+jest.mock('react-native-html-to-pdf', () => ({
+  generatePDF: jest.fn(() => Promise.resolve({filePath: '/tmp/daily-report.pdf'})),
+}));
+
+jest.mock('react-native-share', () => ({
+  open: jest.fn(() => Promise.resolve()),
+}));
+
 jest.mock('redux-persist/integration/react', () => {
   const ReactLib = require('react');
 
@@ -117,6 +125,14 @@ const mockState = {
       toPaymentMethod: 'cash',
       notes: '',
     },
+    backendSettings: {
+      supabaseUrl: '',
+      anonKey: '',
+      email: '',
+      lastBackupAtISO: null,
+      lastRestoreAtISO: null,
+      hasUnsyncedChanges: false,
+    },
     incomingTransactions: [],
     customIncomingSources: [],
   },
@@ -135,16 +151,22 @@ jest.mock('../src/store/appSlice', () => ({
   deleteDebt: (payload: string) => ({type: 'app/deleteDebt', payload}),
   deleteExpense: (payload: string) => ({type: 'app/deleteExpense', payload}),
   endCurrentMonth: () => ({type: 'app/endCurrentMonth'}),
+  markBackupSucceeded: () => ({type: 'app/markBackupSucceeded'}),
+  markRestoreSucceeded: () => ({type: 'app/markRestoreSucceeded'}),
   openMonthDetails: (payload: string) => ({type: 'app/openMonthDetails', payload}),
   resetDebtForms: () => ({type: 'app/resetDebtForms'}),
   resetForm: () => ({type: 'app/resetForm'}),
   resetTransferForm: () => ({type: 'app/resetTransferForm'}),
+  restoreAppFromBackup: (payload: unknown) => ({type: 'app/restoreAppFromBackup', payload}),
   saveDebtFromForm: () => ({type: 'app/saveDebtFromForm'}),
   saveIncomingFromForm: () => ({type: 'app/saveIncomingFromForm'}),
   saveDebtTransactionFromForm: () => ({type: 'app/saveDebtTransactionFromForm'}),
   saveExpenseFromForm: () => ({type: 'app/saveExpenseFromForm'}),
   saveTransferFromForm: () => ({type: 'app/saveTransferFromForm'}),
   setAmountText: (payload: string) => ({type: 'app/setAmountText', payload}),
+  setBackendAnonKey: (payload: string) => ({type: 'app/setBackendAnonKey', payload}),
+  setBackendEmail: (payload: string) => ({type: 'app/setBackendEmail', payload}),
+  setBackendSupabaseUrl: (payload: string) => ({type: 'app/setBackendSupabaseUrl', payload}),
   setDebtDirection: (payload: string) => ({type: 'app/setDebtDirection', payload}),
   setDebtDueDateISO: (payload: string) => ({type: 'app/setDebtDueDateISO', payload}),
   setDebtNotes: (payload: string) => ({type: 'app/setDebtNotes', payload}),

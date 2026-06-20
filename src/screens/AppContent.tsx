@@ -19,7 +19,9 @@ import {
 import {DRAWER_OPEN_THRESHOLD, DRAWER_WIDTH} from '../constants/layout';
 import {AccountingPeriod, BalanceTransaction, PieDatum} from '../types/expense';
 import {formatDate, formatPeriodLabel} from '../utils/date';
+import {shareMonthPdfReport} from '../services/monthPdfReport';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
+import {persistor} from '../store/store';
 import {
   addCategoryFromForm,
   addIncomingCustomSourceFromForm,
@@ -27,16 +29,22 @@ import {
   deleteDebt,
   deleteExpense,
   endCurrentMonth,
+  markBackupSucceeded,
+  markRestoreSucceeded,
   openMonthDetails,
   resetDebtForms,
   resetForm,
   resetTransferForm,
+  restoreAppFromBackup,
   saveDebtFromForm,
   saveIncomingFromForm,
   saveDebtTransactionFromForm,
   saveExpenseFromForm,
   saveTransferFromForm,
   setAmountText,
+  setBackendAnonKey,
+  setBackendEmail,
+  setBackendSupabaseUrl,
   setDebtDirection,
   setDebtDueDateISO,
   setDebtNotes,
@@ -63,6 +71,7 @@ import {
   startEditingExpense,
 } from '../store/appSlice';
 import styles from '../styles/appStyles';
+import BackupPage from './pages/BackupPage';
 import BalancesPage from './pages/BalancesPage';
 import DebtsPage from './pages/DebtsPage';
 import MainPage from './pages/MainPage';
@@ -72,6 +81,14 @@ import MonthsPage from './pages/MonthsPage';
 const DEBT_PAYMENTS_CATEGORY = 'ديون';
 const EMPTY_BALANCE_TRANSACTIONS: BalanceTransaction[] = [];
 const EMPTY_PERIODS: AccountingPeriod[] = [];
+const DEFAULT_BACKEND_SETTINGS = {
+  supabaseUrl: '',
+  anonKey: '',
+  email: '',
+  lastBackupAtISO: null,
+  lastRestoreAtISO: null,
+  hasUnsyncedChanges: false,
+};
 
 function AppContent(): React.JSX.Element {
   const dispatch = useAppDispatch();
@@ -79,6 +96,8 @@ function AppContent(): React.JSX.Element {
   const [showDebtDueDatePicker, setShowDebtDueDatePicker] = useState(false);
   const drawerTranslateX = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
   const drawerOverlayOpacity = useRef(new Animated.Value(0)).current;
+
+  const appState = useAppSelector(state => state.app);
 
   const {
     expenses,
@@ -94,8 +113,9 @@ function AppContent(): React.JSX.Element {
     debtTransactionForm: rawDebtTransactionForm,
     incomingForm: rawIncomingForm,
     transferForm: rawTransferForm,
+    backendSettings: rawBackendSettings,
     customIncomingSources: rawCustomIncomingSources,
-  } = useAppSelector(state => state.app);
+  } = appState;
 
   const debtForm = rawDebtForm ?? {
     personName: '',
@@ -125,6 +145,15 @@ function AppContent(): React.JSX.Element {
     toPaymentMethod: 'cash' as const,
     notes: '',
   };
+
+  const backendSettings = rawBackendSettings ?? DEFAULT_BACKEND_SETTINGS;
+  const backupPayload = useMemo(
+    () => ({
+      ...appState,
+      backendSettings,
+    }),
+    [appState, backendSettings],
+  );
 
   const customIncomingSources = rawCustomIncomingSources ?? [];
   const balanceTransactions = rawBalanceTransactions ?? EMPTY_BALANCE_TRANSACTIONS;
@@ -175,6 +204,46 @@ function AppContent(): React.JSX.Element {
 
     return expenses.filter(item => item.periodKey === selectedMonth);
   }, [expenses, selectedMonth]);
+
+  const selectedMonthBalanceTransactions = useMemo(() => {
+    if (!selectedMonth) {
+      return [];
+    }
+
+    return balanceTransactions.filter(item => item.periodKey === selectedMonth);
+  }, [balanceTransactions, selectedMonth]);
+
+  const selectedMonthSummary = useMemo(() => {
+    return selectedMonthBalanceTransactions.reduce(
+      (acc, item) => {
+        if (item.type === 'incoming') {
+          acc.income += item.amount;
+        }
+
+        if (item.type === 'expense') {
+          acc.expenses += Math.abs(item.amount);
+        }
+
+        if (item.type === 'debtPayment') {
+          acc.debtPayments += Math.abs(item.amount);
+        }
+
+        if (item.type === 'debtCollection') {
+          acc.debtCollections += item.amount;
+        }
+
+        acc.net += item.amount;
+        return acc;
+      },
+      {
+        income: 0,
+        expenses: 0,
+        debtPayments: 0,
+        debtCollections: 0,
+        net: 0,
+      },
+    );
+  }, [selectedMonthBalanceTransactions]);
 
   const totalAllExpenses = useMemo(
     () => currentPeriodExpenses.reduce((sum, item) => sum + item.amount, 0),
@@ -436,6 +505,40 @@ function AppContent(): React.JSX.Element {
     [debtPaymentsTotalsByCategorySelectedMonth, totalsByCategorySelectedMonth],
   );
 
+  const selectedMonthCategoryTotals = useMemo(
+    () =>
+      Object.entries(
+        mergeCategoryTotals(
+          totalsByCategorySelectedMonth,
+          debtPaymentsTotalsByCategorySelectedMonth,
+        ),
+      )
+        .map(([category, total]) => ({category, total}))
+        .sort((first, second) => second.total - first.total),
+    [debtPaymentsTotalsByCategorySelectedMonth, totalsByCategorySelectedMonth],
+  );
+
+  const shareSelectedMonthPdf = async () => {
+    if (!selectedPeriod) {
+      Alert.alert('بيانات ناقصة', 'اختر شهرا أولا لإنشاء التقرير.');
+      return;
+    }
+
+    try {
+      await shareMonthPdfReport({
+        monthLabel: formatPeriodLabel(selectedPeriod.startedAtISO),
+        expenses: selectedMonthExpenses,
+        balanceTransactions: selectedMonthBalanceTransactions,
+        summary: selectedMonthSummary,
+        categoryTotals: selectedMonthCategoryTotals,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'تعذر إنشاء تقرير PDF.';
+      Alert.alert('خطأ', message);
+    }
+  };
+
   const submitExpense = () => {
     const cleanName = name.trim();
     const amount = Number(amountText);
@@ -625,6 +728,10 @@ function AppContent(): React.JSX.Element {
     );
   };
 
+  const saveBackendSettings = async () => {
+    await persistor.flush();
+  };
+
   const animateDrawer = (open: boolean) => {
     if (open) {
       setShowNavMenu(true);
@@ -717,7 +824,9 @@ function AppContent(): React.JSX.Element {
     },
   });
 
-  const openPageFromMenu = (targetPage: 'main' | 'balances' | 'months' | 'debts') => {
+  const openPageFromMenu = (
+    targetPage: 'main' | 'balances' | 'months' | 'debts' | 'backup',
+  ) => {
     closeMenu();
     dispatch(setPage(targetPage));
   };
@@ -775,6 +884,12 @@ function AppContent(): React.JSX.Element {
           style={[styles.topMenuItem, styles.topMenuItemLast]}
           onPress={() => openPageFromMenu('months')}>
           <Text style={styles.topMenuItemText}>عرض الشهور السابقة</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.topMenuItem, styles.topMenuItemLast]}
+          onPress={() => openPageFromMenu('backup')}>
+          <Text style={styles.topMenuItemText}>النسخ الاحتياطي</Text>
         </TouchableOpacity>
       </Animated.View>
     </>
@@ -896,6 +1011,21 @@ function AppContent(): React.JSX.Element {
               />
             ) : null}
 
+            {page === 'backup' ? (
+              <BackupPage
+                backupPayload={backupPayload}
+                backendSettings={backendSettings}
+                onBack={() => dispatch(setPage('main'))}
+                onSupabaseUrlChange={value => dispatch(setBackendSupabaseUrl(value))}
+                onAnonKeyChange={value => dispatch(setBackendAnonKey(value))}
+                onEmailChange={value => dispatch(setBackendEmail(value))}
+                onSaveSettings={saveBackendSettings}
+                onBackupSucceeded={() => dispatch(markBackupSucceeded())}
+                onRestoreSucceeded={() => dispatch(markRestoreSucceeded())}
+                onRestoreBackup={payload => dispatch(restoreAppFromBackup(payload))}
+              />
+            ) : null}
+
             {page === 'monthDetails' ? (
               <MonthDetailsPage
                 selectedMonth={selectedMonth}
@@ -908,6 +1038,7 @@ function AppContent(): React.JSX.Element {
                 selectedMonthExpenses={selectedMonthExpenses}
                 pieDataSelectedMonth={pieDataSelectedMonth}
                 onBack={() => dispatch(setPage('months'))}
+                onSharePdf={shareSelectedMonthPdf}
                 onEditExpense={expense => dispatch(startEditingExpense(expense))}
                 onDeleteExpense={expenseId => dispatch(deleteExpense(expenseId))}
               />

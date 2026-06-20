@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text, View} from 'react-native';
+import {Text, TouchableOpacity, View} from 'react-native';
 import ExpensesTableCard from '../../components/ExpensesTableCard';
 import PageHeader from '../../components/PageHeader';
 import PieChartCard from '../../components/PieChartCard';
@@ -13,6 +13,7 @@ type MonthDetailsPageProps = {
   selectedMonthExpenses: Expense[];
   pieDataSelectedMonth: PieDatum[];
   onBack: () => void;
+  onSharePdf: () => void;
   onEditExpense: (expense: Expense) => void;
   onDeleteExpense: (expenseId: string) => void;
 };
@@ -24,6 +25,7 @@ function MonthDetailsPage({
   selectedMonthExpenses,
   pieDataSelectedMonth,
   onBack,
+  onSharePdf,
   onEditExpense,
   onDeleteExpense,
 }: MonthDetailsPageProps): React.JSX.Element {
@@ -37,6 +39,12 @@ function MonthDetailsPage({
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>إجمالي الشهر المحدد</Text>
         <Text style={styles.totalValue}>{totalSelectedMonthExpenses.toFixed(2)} ج.م</Text>
+      </View>
+
+      <View style={styles.inlineRow}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={onSharePdf}>
+          <Text style={styles.btnText}>مشاركة PDF</Text>
+        </TouchableOpacity>
       </View>
 
       <ExpensesTableCard

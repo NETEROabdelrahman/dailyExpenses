@@ -266,6 +266,19 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 8,
   },
+  backupCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#dbeafe',
+    padding: 14,
+    gap: 10,
+  },
+  backupStatusText: {
+    color: '#334155',
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
   moneySummaryRow: {
     flexDirection: 'row-reverse',
     justifyContent: 'space-between',

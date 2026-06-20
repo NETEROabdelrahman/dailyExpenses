@@ -97,6 +97,7 @@ type PersistedRootState = ReturnType<typeof rootReducer> & {
       fromPaymentMethod?: 'cash' | 'bank' | 'wallet';
       toPaymentMethod?: 'cash' | 'bank' | 'wallet';
     };
+    backendSettings?: ReturnType<typeof appReducer>['backendSettings'];
     form?: ReturnType<typeof appReducer>['form'] & {
       selectedPaymentMethod?: 'cash' | 'bank' | 'wallet';
     };
@@ -530,11 +531,61 @@ const migrations: MigrationManifest = {
     nextState.app = nextApp;
     return nextState;
   },
+  9: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+
+    nextApp.backendSettings = {
+      supabaseUrl: nextApp.backendSettings?.supabaseUrl ?? '',
+      anonKey: nextApp.backendSettings?.anonKey ?? '',
+      email: nextApp.backendSettings?.email ?? '',
+      lastBackupAtISO: nextApp.backendSettings?.lastBackupAtISO ?? null,
+      lastRestoreAtISO: nextApp.backendSettings?.lastRestoreAtISO ?? null,
+      hasUnsyncedChanges: nextApp.backendSettings?.hasUnsyncedChanges ?? false,
+    };
+
+    nextState.app = nextApp;
+    return nextState;
+  },
+  10: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+
+    nextApp.backendSettings = {
+      supabaseUrl: nextApp.backendSettings?.supabaseUrl ?? '',
+      anonKey: nextApp.backendSettings?.anonKey ?? '',
+      email: nextApp.backendSettings?.email ?? '',
+      lastBackupAtISO: nextApp.backendSettings?.lastBackupAtISO ?? null,
+      lastRestoreAtISO: nextApp.backendSettings?.lastRestoreAtISO ?? null,
+      hasUnsyncedChanges: nextApp.backendSettings?.hasUnsyncedChanges ?? false,
+    };
+
+    nextState.app = nextApp;
+    return nextState;
+  },
 };
 
 const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: 'root',
-  version: 8,
+  version: 10,
   storage: AsyncStorage,
   whitelist: ['app'],
   migrate: createMigrate(migrations, {debug: false}),

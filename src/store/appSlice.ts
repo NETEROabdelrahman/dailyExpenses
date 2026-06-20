@@ -16,7 +16,7 @@ import {
 } from '../types/expense';
 import {formatPeriodLabel, normalizedDateISO} from '../utils/date';
 
-type AppState = {
+export type AppState = {
   expenses: Expense[];
   debts: Debt[];
   balanceTransactions: BalanceTransaction[];
@@ -68,6 +68,14 @@ type AppState = {
     toPaymentMethod: PaymentMethod;
     notes: string;
   };
+  backendSettings: {
+    supabaseUrl: string;
+    anonKey: string;
+    email: string;
+    lastBackupAtISO: string | null;
+    lastRestoreAtISO: string | null;
+    hasUnsyncedChanges: boolean;
+  };
 };
 
 const DEFAULT_PAYMENT_METHOD: PaymentMethod = 'cash';
@@ -76,6 +84,14 @@ const DEFAULT_TRANSFER_TO_PAYMENT_METHOD: PaymentMethod = 'cash';
 const DEFAULT_DEBT_DIRECTION: DebtDirection = 'owe';
 const DEFAULT_INCOMING_SOURCE: IncomingMoneySourceType = 'salary';
 const FIRST_PERIOD_ID = 'period_1';
+const DEFAULT_BACKEND_SETTINGS: AppState['backendSettings'] = {
+  supabaseUrl: '',
+  anonKey: '',
+  email: '',
+  lastBackupAtISO: null,
+  lastRestoreAtISO: null,
+  hasUnsyncedChanges: false,
+};
 
 const roundMoney = (value: number): number => Math.round(value * 100) / 100;
 
@@ -300,6 +316,7 @@ const createInitialState = (): AppState => ({
     toPaymentMethod: DEFAULT_TRANSFER_TO_PAYMENT_METHOD,
     notes: '',
   },
+  backendSettings: {...DEFAULT_BACKEND_SETTINGS},
 });
 
 const resetFormValues = (state: AppState) => {
@@ -399,6 +416,18 @@ const ensureTransferRuntimeState = (state: AppState) => {
       notes: '',
     };
   }
+};
+
+const ensureBackendSettingsRuntimeState = (state: AppState) => {
+  state.backendSettings = {
+    ...DEFAULT_BACKEND_SETTINGS,
+    ...(state.backendSettings ?? {}),
+  };
+};
+
+const markNeedsBackup = (state: AppState) => {
+  ensureBackendSettingsRuntimeState(state);
+  state.backendSettings.hasUnsyncedChanges = true;
 };
 
 const appSlice = createSlice({
@@ -521,6 +550,28 @@ const appSlice = createSlice({
       ensureTransferRuntimeState(state);
       state.transferForm.notes = action.payload;
     },
+    setBackendSupabaseUrl(state, action: PayloadAction<string>) {
+      ensureBackendSettingsRuntimeState(state);
+      state.backendSettings.supabaseUrl = action.payload;
+    },
+    setBackendAnonKey(state, action: PayloadAction<string>) {
+      ensureBackendSettingsRuntimeState(state);
+      state.backendSettings.anonKey = action.payload;
+    },
+    setBackendEmail(state, action: PayloadAction<string>) {
+      ensureBackendSettingsRuntimeState(state);
+      state.backendSettings.email = action.payload;
+    },
+    markBackupSucceeded(state) {
+      ensureBackendSettingsRuntimeState(state);
+      state.backendSettings.lastBackupAtISO = new Date().toISOString();
+      state.backendSettings.hasUnsyncedChanges = false;
+    },
+    markRestoreSucceeded(state) {
+      ensureBackendSettingsRuntimeState(state);
+      state.backendSettings.lastRestoreAtISO = new Date().toISOString();
+      state.backendSettings.hasUnsyncedChanges = false;
+    },
     addIncomingCustomSourceFromForm(state) {
       ensureIncomingRuntimeState(state);
       const cleanLabel = state.incomingForm.sourceOtherText.trim();
@@ -538,6 +589,7 @@ const appSlice = createSlice({
       }
 
       state.customIncomingSources = [cleanLabel, ...state.customIncomingSources];
+      markNeedsBackup(state);
     },
     resetForm(state) {
       resetFormValues(state);
@@ -573,6 +625,7 @@ const appSlice = createSlice({
       state.categories.push(clean);
       state.form.selectedCategory = clean;
       state.form.newCategory = '';
+      markNeedsBackup(state);
     },
     saveExpenseFromForm(state) {
       ensureBalanceLedgerRuntimeState(state);
@@ -639,6 +692,7 @@ const appSlice = createSlice({
           sourceId: currentExpense.id,
         });
         resetFormValues(state);
+        markNeedsBackup(state);
         return;
       }
 
@@ -672,6 +726,7 @@ const appSlice = createSlice({
         sourceId: expenseId,
       });
       resetFormValues(state);
+      markNeedsBackup(state);
     },
     saveDebtFromForm(state) {
       ensureDebtRuntimeState(state);
@@ -700,6 +755,7 @@ const appSlice = createSlice({
       state.debts = [debt, ...state.debts];
       state.debtTransactionForm.selectedDebtId = debt.id;
       resetDebtFormValues(state);
+      markNeedsBackup(state);
     },
     saveDebtTransactionFromForm(state) {
       ensureDebtRuntimeState(state);
@@ -768,6 +824,7 @@ const appSlice = createSlice({
 
       state.debtTransactionForm.amountText = '';
       state.debtTransactionForm.transactionDateISO = new Date().toISOString();
+      markNeedsBackup(state);
     },
     saveIncomingFromForm(state) {
       ensureIncomingRuntimeState(state);
@@ -812,6 +869,7 @@ const appSlice = createSlice({
       });
       state.incomingForm.amountText = '';
       state.incomingForm.sourceOtherText = '';
+      markNeedsBackup(state);
     },
     deleteIncomingTransaction(state, action: PayloadAction<string>) {
       ensureIncomingRuntimeState(state);
@@ -826,6 +884,7 @@ const appSlice = createSlice({
         item => item.id !== transactionId,
       );
       removeBalanceTransactionsBySource(state, 'incoming', transactionId);
+      markNeedsBackup(state);
     },
     saveTransferFromForm(state) {
       ensureTransferRuntimeState(state);
@@ -883,6 +942,7 @@ const appSlice = createSlice({
 
       state.transferForm.amountText = '';
       state.transferForm.notes = '';
+      markNeedsBackup(state);
     },
     deleteDebt(state, action: PayloadAction<string>) {
       const debtId = action.payload;
@@ -898,6 +958,7 @@ const appSlice = createSlice({
       if (state.debtTransactionForm.selectedDebtId === debtId) {
         state.debtTransactionForm.selectedDebtId = state.debts[0]?.id ?? null;
       }
+      markNeedsBackup(state);
     },
     startEditingExpense(state, action: PayloadAction<Expense>) {
       const expense = action.payload;
@@ -922,6 +983,7 @@ const appSlice = createSlice({
       if (state.form.editingExpenseId === expenseId) {
         resetFormValues(state);
       }
+      markNeedsBackup(state);
     },
     openMonthDetails(state, action: PayloadAction<string>) {
       state.selectedMonth = action.payload;
@@ -947,6 +1009,31 @@ const appSlice = createSlice({
       state.periods = [nextPeriod, ...state.periods];
       state.currentPeriodId = nextPeriod.id;
       state.selectedMonth = currentPeriodId;
+      markNeedsBackup(state);
+    },
+    restoreAppFromBackup(state, action: PayloadAction<AppState>) {
+      const localBackendSettings = {
+        ...DEFAULT_BACKEND_SETTINGS,
+        ...(state.backendSettings ?? {}),
+      };
+      const restoredBackendSettings = {
+        ...DEFAULT_BACKEND_SETTINGS,
+        ...(action.payload.backendSettings ?? {}),
+      };
+
+      Object.assign(state, {
+        ...createInitialState(),
+        ...action.payload,
+        backendSettings: {
+          ...restoredBackendSettings,
+          supabaseUrl:
+            localBackendSettings.supabaseUrl || restoredBackendSettings.supabaseUrl,
+          anonKey: localBackendSettings.anonKey || restoredBackendSettings.anonKey,
+          email: localBackendSettings.email || restoredBackendSettings.email,
+        },
+        page: 'main',
+        selectedMonth: null,
+      });
     },
   },
 });
@@ -963,6 +1050,7 @@ export const {
   resetDebtForms,
   resetIncomingForm,
   resetTransferForm,
+  restoreAppFromBackup,
   saveDebtFromForm,
   saveIncomingFromForm,
   saveDebtTransactionFromForm,
@@ -989,6 +1077,11 @@ export const {
   setTransferFromPaymentMethod,
   setTransferNotes,
   setTransferToPaymentMethod,
+  setBackendAnonKey,
+  setBackendEmail,
+  setBackendSupabaseUrl,
+  markBackupSucceeded,
+  markRestoreSucceeded,
   setInitialBankText,
   setInitialCashText,
   setInitialWalletText,

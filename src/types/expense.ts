@@ -99,4 +99,10 @@ export type PieDatum = {
   color: string;
 };
 
-export type AppPage = 'main' | 'balances' | 'debts' | 'months' | 'monthDetails';
+export type AppPage =
+  | 'main'
+  | 'balances'
+  | 'debts'
+  | 'months'
+  | 'monthDetails'
+  | 'backup';
