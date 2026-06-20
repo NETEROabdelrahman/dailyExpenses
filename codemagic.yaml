@@ -1,0 +1,52 @@
+workflows:
+  android-debug:
+    name: Daily Android Debug
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $CM_BUILD_DIR/node_modules
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Lint
+        script: npm run lint
+      - name: Test
+        script: npm test -- --runInBand
+      - name: Build debug APK
+        script: |
+          cd android
+          ./gradlew assembleDebug
+    artifacts:
+      - android/app/build/outputs/**/*.apk
+      - android/app/build/reports/**/*
+
+  android-release:
+    name: Daily Android Release
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      android_signing:
+        - daily_keystore
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $HOME/.gradle/caches
+        - $CM_BUILD_DIR/node_modules
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Lint
+        script: npm run lint
+      - name: Test
+        script: npm test -- --runInBand
+      - name: Build release bundle
+        script: |
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/**/*.aab
+      - android/app/build/outputs/**/*.apk
+      - android/app/build/outputs/mapping/**/mapping.txt
