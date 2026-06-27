@@ -24,6 +24,7 @@ import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {persistor} from '../store/store';
 import {
   addCategoryFromForm,
+  addSubcategoryFromForm,
   addIncomingCustomSourceFromForm,
   deleteIncomingTransaction,
   deleteDebt,
@@ -64,9 +65,11 @@ import {
   setTransferToPaymentMethod,
   setName,
   setNewCategory,
+  setNewSubcategory,
   setNotes,
   setPage,
   setSelectedCategory,
+  setSelectedSubcategory,
   setSelectedPaymentMethod,
   startEditingExpense,
 } from '../store/appSlice';
@@ -79,6 +82,20 @@ import MonthDetailsPage from './pages/MonthDetailsPage';
 import MonthsPage from './pages/MonthsPage';
 
 const DEBT_PAYMENTS_CATEGORY = 'ديون';
+const getCategoryBreakdownKey = (category: string, subcategory = ''): string =>
+  JSON.stringify([category, subcategory]);
+const parseCategoryBreakdownKey = (key: string): [string, string] => {
+  try {
+    const value = JSON.parse(key);
+    if (Array.isArray(value) && typeof value[0] === 'string') {
+      return [value[0], typeof value[1] === 'string' ? value[1] : ''];
+    }
+  } catch {
+    // Supports any totals restored from versions that used category names as keys.
+  }
+
+  return [key, ''];
+};
 const EMPTY_BALANCE_TRANSACTIONS: BalanceTransaction[] = [];
 const EMPTY_PERIODS: AccountingPeriod[] = [];
 const DEFAULT_BACKEND_SETTINGS = {
@@ -106,6 +123,7 @@ function AppContent(): React.JSX.Element {
     periods: rawPeriods,
     currentPeriodId: rawCurrentPeriodId,
     categories,
+    subcategories: rawSubcategories,
     page,
     selectedMonth,
     form,
@@ -169,10 +187,14 @@ function AppContent(): React.JSX.Element {
     expenseDateISO,
     notes,
     selectedCategory,
+    selectedSubcategory = '',
     selectedPaymentMethod,
     newCategory,
+    newSubcategory = '',
     editingExpenseId,
   } = form;
+  const subcategories = rawSubcategories ?? {};
+  const selectedCategorySubcategories = subcategories[selectedCategory] ?? [];
 
   const expenseDate = useMemo(() => new Date(expenseDateISO), [expenseDateISO]);
   const debtDueDate = useMemo(() => new Date(debtForm.dueDateISO), [debtForm.dueDateISO]);
@@ -372,7 +394,8 @@ function AppContent(): React.JSX.Element {
 
   const totalsByCategoryAll = useMemo(() => {
     return currentPeriodExpenses.reduce<Record<string, number>>((acc, item) => {
-      acc[item.category] = (acc[item.category] ?? 0) + item.amount;
+      const key = getCategoryBreakdownKey(item.category, item.subcategory);
+      acc[key] = (acc[key] ?? 0) + item.amount;
       return acc;
     }, {});
   }, [currentPeriodExpenses]);
@@ -385,8 +408,8 @@ function AppContent(): React.JSX.Element {
         }
 
         if ((transaction.periodKey ?? currentPeriodId) === currentPeriodId) {
-          acc[DEBT_PAYMENTS_CATEGORY] =
-            (acc[DEBT_PAYMENTS_CATEGORY] ?? 0) + transaction.amount;
+          const key = getCategoryBreakdownKey(DEBT_PAYMENTS_CATEGORY);
+          acc[key] = (acc[key] ?? 0) + transaction.amount;
         }
       });
 
@@ -396,7 +419,8 @@ function AppContent(): React.JSX.Element {
 
   const totalsByCategorySelectedMonth = useMemo(() => {
     return selectedMonthExpenses.reduce<Record<string, number>>((acc, item) => {
-      acc[item.category] = (acc[item.category] ?? 0) + item.amount;
+      const key = getCategoryBreakdownKey(item.category, item.subcategory);
+      acc[key] = (acc[key] ?? 0) + item.amount;
       return acc;
     }, {});
   }, [selectedMonthExpenses]);
@@ -416,8 +440,8 @@ function AppContent(): React.JSX.Element {
           return;
         }
 
-        acc[DEBT_PAYMENTS_CATEGORY] =
-          (acc[DEBT_PAYMENTS_CATEGORY] ?? 0) + transaction.amount;
+        const key = getCategoryBreakdownKey(DEBT_PAYMENTS_CATEGORY);
+        acc[key] = (acc[key] ?? 0) + transaction.amount;
       });
 
       return acc;
@@ -430,8 +454,8 @@ function AppContent(): React.JSX.Element {
   ): Record<string, number> => {
     const merged: Record<string, number> = {...baseTotals};
 
-    Object.entries(extraTotals).forEach(([category, total]) => {
-      merged[category] = (merged[category] ?? 0) + total;
+    Object.entries(extraTotals).forEach(([key, total]) => {
+      merged[key] = (merged[key] ?? 0) + total;
     });
 
     return merged;
@@ -484,11 +508,16 @@ function AppContent(): React.JSX.Element {
   }, [debtTransactionForm.selectedDebtId, dispatch, selectableDebts]);
 
   const toPieData = (totals: Record<string, number>): PieDatum[] =>
-    Object.entries(totals).map(([category, total]) => ({
-      name: category,
-      population: total,
-      color: getCategoryColor(category),
-    }));
+    Object.entries(totals).map(([key, total]) => {
+      const [category, subcategory] = parseCategoryBreakdownKey(key);
+      const displayName = subcategory ? `${category} / ${subcategory}` : category;
+
+      return {
+        name: displayName,
+        population: total,
+        color: getCategoryColor(displayName),
+      };
+    });
 
   const pieDataAll = useMemo(
     () => toPieData(mergeCategoryTotals(totalsByCategoryAll, debtPaymentsTotalsByCategoryAll)),
@@ -513,7 +542,10 @@ function AppContent(): React.JSX.Element {
           debtPaymentsTotalsByCategorySelectedMonth,
         ),
       )
-        .map(([category, total]) => ({category, total}))
+        .map(([key, total]) => {
+          const [category, subcategory] = parseCategoryBreakdownKey(key);
+          return {category, subcategory, total};
+        })
         .sort((first, second) => second.total - first.total),
     [debtPaymentsTotalsByCategorySelectedMonth, totalsByCategorySelectedMonth],
   );
@@ -914,9 +946,12 @@ function AppContent(): React.JSX.Element {
                 expenseDate={expenseDate}
                 notes={notes}
                 selectedCategory={selectedCategory}
+                selectedSubcategory={selectedSubcategory}
                 selectedPaymentMethod={selectedPaymentMethod}
                 newCategory={newCategory}
+                newSubcategory={newSubcategory}
                 categories={categories}
+                subcategories={selectedCategorySubcategories}
                 editingExpenseId={editingExpenseId}
                 totalAllExpenses={totalAllExpenses}
                 expenses={currentPeriodExpenses}
@@ -927,11 +962,16 @@ function AppContent(): React.JSX.Element {
                 onDateChange={value => dispatch(setExpenseDateISO(value.toISOString()))}
                 onNotesChange={value => dispatch(setNotes(value))}
                 onSelectedCategoryChange={value => dispatch(setSelectedCategory(value))}
+                onSelectedSubcategoryChange={value =>
+                  dispatch(setSelectedSubcategory(value))
+                }
                 onSelectedPaymentMethodChange={value =>
                   dispatch(setSelectedPaymentMethod(value))
                 }
                 onNewCategoryChange={value => dispatch(setNewCategory(value))}
+                onNewSubcategoryChange={value => dispatch(setNewSubcategory(value))}
                 onAddCategory={() => dispatch(addCategoryFromForm())}
+                onAddSubcategory={() => dispatch(addSubcategoryFromForm())}
                 onSubmitExpense={submitExpense}
                 onCancelEdit={() => dispatch(resetForm())}
                 onEditExpense={expense => dispatch(startEditingExpense(expense))}

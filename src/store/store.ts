@@ -35,6 +35,7 @@ type PersistedExpense = {
   periodKey?: string;
   notes: string;
   category: string;
+  subcategory?: string;
   paymentMethod?: 'cash' | 'bank' | 'wallet';
 };
 
@@ -581,11 +582,64 @@ const migrations: MigrationManifest = {
     nextState.app = nextApp;
     return nextState;
   },
+  11: (state: PersistedState): PersistedState => {
+    const nextState = {
+      ...state,
+    } as PersistedState & {
+      app?: PersistedRootState['app'];
+    };
+
+    if (!nextState.app) {
+      return state;
+    }
+
+    const nextApp = {...nextState.app};
+    const categories = Array.isArray(nextApp.categories) ? nextApp.categories : [];
+    const existingSubcategories =
+      nextApp.subcategories && typeof nextApp.subcategories === 'object'
+        ? nextApp.subcategories
+        : {};
+
+    nextApp.subcategories = categories.reduce<Record<string, string[]>>(
+      (result, category) => {
+        const values = existingSubcategories[category];
+        result[category] = Array.isArray(values)
+          ? values.filter(value => typeof value === 'string')
+          : [];
+        return result;
+      },
+      {},
+    );
+
+    if (Array.isArray(nextApp.expenses)) {
+      nextApp.expenses = nextApp.expenses.map(expense => ({
+        ...expense,
+        subcategory: typeof expense.subcategory === 'string' ? expense.subcategory : '',
+      }));
+    }
+
+    if (nextApp.form) {
+      nextApp.form = {
+        ...nextApp.form,
+        selectedSubcategory:
+          typeof nextApp.form.selectedSubcategory === 'string'
+            ? nextApp.form.selectedSubcategory
+            : '',
+        newSubcategory:
+          typeof nextApp.form.newSubcategory === 'string'
+            ? nextApp.form.newSubcategory
+            : '',
+      };
+    }
+
+    nextState.app = nextApp;
+    return nextState;
+  },
 };
 
 const persistConfig: PersistConfig<ReturnType<typeof rootReducer>> = {
   key: 'root',
-  version: 10,
+  version: 11,
   storage: AsyncStorage,
   whitelist: ['app'],
   migrate: createMigrate(migrations, {debug: false}),

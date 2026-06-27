@@ -25,6 +25,7 @@ export type AppState = {
   currentPeriodId: string;
   customIncomingSources: string[];
   categories: string[];
+  subcategories: Record<string, string[]>;
   initialCashText: string;
   initialBankText: string;
   initialWalletText: string;
@@ -39,8 +40,10 @@ export type AppState = {
     expenseDateISO: string;
     notes: string;
     selectedCategory: string;
+    selectedSubcategory: string;
     selectedPaymentMethod: PaymentMethod;
     newCategory: string;
+    newSubcategory: string;
     editingExpenseId: string | null;
   };
   debtForm: {
@@ -273,6 +276,7 @@ const createInitialState = (): AppState => ({
   currentPeriodId: FIRST_PERIOD_ID,
   customIncomingSources: [],
   categories: DEFAULT_CATEGORIES,
+  subcategories: Object.fromEntries(DEFAULT_CATEGORIES.map(category => [category, []])),
   initialCashText: '',
   initialBankText: '',
   initialWalletText: '',
@@ -287,8 +291,10 @@ const createInitialState = (): AppState => ({
     expenseDateISO: new Date().toISOString(),
     notes: '',
     selectedCategory: DEFAULT_CATEGORIES[0],
+    selectedSubcategory: '',
     selectedPaymentMethod: DEFAULT_PAYMENT_METHOD,
     newCategory: '',
+    newSubcategory: '',
     editingExpenseId: null,
   },
   debtForm: {
@@ -327,8 +333,10 @@ const resetFormValues = (state: AppState) => {
       expenseDateISO: new Date().toISOString(),
       notes: '',
       selectedCategory: DEFAULT_CATEGORIES[0],
+      selectedSubcategory: '',
       selectedPaymentMethod: DEFAULT_PAYMENT_METHOD,
       newCategory: '',
+      newSubcategory: '',
       editingExpenseId: null,
     };
   }
@@ -339,6 +347,8 @@ const resetFormValues = (state: AppState) => {
   state.form.notes = '';
   state.form.selectedPaymentMethod = DEFAULT_PAYMENT_METHOD;
   state.form.newCategory = '';
+  state.form.selectedSubcategory = '';
+  state.form.newSubcategory = '';
   state.form.editingExpenseId = null;
 };
 
@@ -448,12 +458,22 @@ const appSlice = createSlice({
     },
     setSelectedCategory(state, action: PayloadAction<string>) {
       state.form.selectedCategory = action.payload;
+      const categorySubcategories = state.subcategories[action.payload] ?? [];
+      if (!categorySubcategories.includes(state.form.selectedSubcategory)) {
+        state.form.selectedSubcategory = '';
+      }
+    },
+    setSelectedSubcategory(state, action: PayloadAction<string>) {
+      state.form.selectedSubcategory = action.payload;
     },
     setSelectedPaymentMethod(state, action: PayloadAction<PaymentMethod>) {
       state.form.selectedPaymentMethod = action.payload;
     },
     setNewCategory(state, action: PayloadAction<string>) {
       state.form.newCategory = action.payload;
+    },
+    setNewSubcategory(state, action: PayloadAction<string>) {
+      state.form.newSubcategory = action.payload;
     },
     setInitialCashText(state, action: PayloadAction<string>) {
       state.initialCashText = action.payload;
@@ -623,8 +643,24 @@ const appSlice = createSlice({
       }
 
       state.categories.push(clean);
+      state.subcategories[clean] = [];
       state.form.selectedCategory = clean;
+      state.form.selectedSubcategory = '';
       state.form.newCategory = '';
+      markNeedsBackup(state);
+    },
+    addSubcategoryFromForm(state) {
+      const category = state.form.selectedCategory;
+      const clean = state.form.newSubcategory.trim();
+      const categorySubcategories = state.subcategories[category] ?? [];
+
+      if (!category || !clean || categorySubcategories.includes(clean)) {
+        return;
+      }
+
+      state.subcategories[category] = [...categorySubcategories, clean];
+      state.form.selectedSubcategory = clean;
+      state.form.newSubcategory = '';
       markNeedsBackup(state);
     },
     saveExpenseFromForm(state) {
@@ -676,6 +712,7 @@ const appSlice = createSlice({
             periodKey,
             notes: state.form.notes.trim(),
             category: state.form.selectedCategory,
+            subcategory: state.form.selectedSubcategory,
             paymentMethod: selectedPaymentMethod,
           };
         });
@@ -710,6 +747,7 @@ const appSlice = createSlice({
         periodKey: activePeriodId,
         notes: state.form.notes.trim(),
         category: state.form.selectedCategory,
+        subcategory: state.form.selectedSubcategory,
         paymentMethod: selectedPaymentMethod,
       };
 
@@ -969,6 +1007,7 @@ const appSlice = createSlice({
       state.form.expenseDateISO = expense.dateISO;
       state.form.notes = expense.notes;
       state.form.selectedCategory = expense.category;
+      state.form.selectedSubcategory = expense.subcategory ?? '';
       state.form.selectedPaymentMethod = normalizePaymentMethod(expense.paymentMethod);
     },
     deleteExpense(state, action: PayloadAction<string>) {
@@ -1020,10 +1059,37 @@ const appSlice = createSlice({
         ...DEFAULT_BACKEND_SETTINGS,
         ...(action.payload.backendSettings ?? {}),
       };
+      const restoredCategories = Array.isArray(action.payload.categories)
+        ? action.payload.categories
+        : DEFAULT_CATEGORIES;
+      const restoredSubcategories = restoredCategories.reduce<Record<string, string[]>>(
+        (result, category) => {
+          const values = action.payload.subcategories?.[category];
+          result[category] = Array.isArray(values)
+            ? values.filter(value => typeof value === 'string')
+            : [];
+          return result;
+        },
+        {},
+      );
+      const initialForm = createInitialState().form;
+      const restoredForm = {
+        ...initialForm,
+        ...(action.payload.form ?? {}),
+        selectedSubcategory: action.payload.form?.selectedSubcategory ?? '',
+        newSubcategory: action.payload.form?.newSubcategory ?? '',
+      };
 
       Object.assign(state, {
         ...createInitialState(),
         ...action.payload,
+        categories: restoredCategories,
+        subcategories: restoredSubcategories,
+        expenses: (action.payload.expenses ?? []).map(expense => ({
+          ...expense,
+          subcategory: expense.subcategory ?? '',
+        })),
+        form: restoredForm,
         backendSettings: {
           ...restoredBackendSettings,
           supabaseUrl:
@@ -1040,6 +1106,7 @@ const appSlice = createSlice({
 
 export const {
   addCategoryFromForm,
+  addSubcategoryFromForm,
   addIncomingCustomSourceFromForm,
   deleteIncomingTransaction,
   deleteDebt,
@@ -1087,9 +1154,11 @@ export const {
   setInitialWalletText,
   setName,
   setNewCategory,
+  setNewSubcategory,
   setNotes,
   setPage,
   setSelectedCategory,
+  setSelectedSubcategory,
   setSelectedPaymentMethod,
   setSelectedMonth,
   setWalletText,

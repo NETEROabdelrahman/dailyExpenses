@@ -13,6 +13,7 @@ type MonthReportSummary = {
 
 type CategoryTotal = {
   category: string;
+  subcategory: string;
   total: number;
 };
 
@@ -56,7 +57,7 @@ const getBalanceTransactionTypeLabel = (type: BalanceTransaction['type']) => {
 
 const buildExpensesRows = (expenses: Expense[]) => {
   if (expenses.length === 0) {
-    return '<tr><td colspan="5" class="empty">لا توجد مصاريف في هذا الشهر</td></tr>';
+    return '<tr><td colspan="6" class="empty">لا توجد مصاريف في هذا الشهر</td></tr>';
   }
 
   return expenses
@@ -66,6 +67,7 @@ const buildExpensesRows = (expenses: Expense[]) => {
           <td>${escapeHtml(item.name)}</td>
           <td>${formatMoney(item.amount)}</td>
           <td>${escapeHtml(item.category)}</td>
+          <td>${escapeHtml(item.subcategory || '-')}</td>
           <td>${formatDate(item.dateISO)}</td>
           <td>${escapeHtml(item.notes || '-')}</td>
         </tr>
@@ -95,7 +97,7 @@ const buildMovementsRows = (items: BalanceTransaction[]) => {
 
 const buildCategoryRows = (categoryTotals: CategoryTotal[]) => {
   if (categoryTotals.length === 0) {
-    return '<tr><td colspan="2" class="empty">لا توجد فئات في هذا الشهر</td></tr>';
+    return '<tr><td colspan="3" class="empty">لا توجد فئات في هذا الشهر</td></tr>';
   }
 
   return categoryTotals
@@ -103,6 +105,7 @@ const buildCategoryRows = (categoryTotals: CategoryTotal[]) => {
       item => `
         <tr>
           <td>${escapeHtml(item.category)}</td>
+          <td>${escapeHtml(item.subcategory || '-')}</td>
           <td>${formatMoney(item.total)}</td>
         </tr>
       `,
@@ -232,6 +235,7 @@ const buildHtml = ({
         <th>الاسم</th>
         <th>المبلغ</th>
         <th>الفئة</th>
+        <th>الفئة الفرعية</th>
         <th>التاريخ</th>
         <th>ملاحظات</th>
       </tr>
@@ -244,6 +248,7 @@ const buildHtml = ({
     <thead>
       <tr>
         <th>الفئة</th>
+        <th>الفئة الفرعية</th>
         <th>الإجمالي</th>
       </tr>
     </thead>

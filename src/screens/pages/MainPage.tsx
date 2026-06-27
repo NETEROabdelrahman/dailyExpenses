@@ -22,9 +22,12 @@ type MainPageProps = {
   expenseDate: Date;
   notes: string;
   selectedCategory: string;
+  selectedSubcategory: string;
   selectedPaymentMethod: PaymentMethod;
   newCategory: string;
+  newSubcategory: string;
   categories: string[];
+  subcategories: string[];
   editingExpenseId: string | null;
   totalAllExpenses: number;
   expenses: Expense[];
@@ -35,9 +38,12 @@ type MainPageProps = {
   onDateChange: (value: Date) => void;
   onNotesChange: (value: string) => void;
   onSelectedCategoryChange: (value: string) => void;
+  onSelectedSubcategoryChange: (value: string) => void;
   onSelectedPaymentMethodChange: (value: PaymentMethod) => void;
   onNewCategoryChange: (value: string) => void;
+  onNewSubcategoryChange: (value: string) => void;
   onAddCategory: () => void;
+  onAddSubcategory: () => void;
   onSubmitExpense: () => void;
   onCancelEdit: () => void;
   onEditExpense: (expense: Expense) => void;
@@ -54,9 +60,12 @@ function MainPage({
   expenseDate,
   notes,
   selectedCategory,
+  selectedSubcategory,
   selectedPaymentMethod,
   newCategory,
+  newSubcategory,
   categories,
+  subcategories,
   editingExpenseId,
   totalAllExpenses,
   expenses,
@@ -67,9 +76,12 @@ function MainPage({
   onDateChange,
   onNotesChange,
   onSelectedCategoryChange,
+  onSelectedSubcategoryChange,
   onSelectedPaymentMethodChange,
   onNewCategoryChange,
+  onNewSubcategoryChange,
   onAddCategory,
+  onAddSubcategory,
   onSubmitExpense,
   onCancelEdit,
   onEditExpense,
@@ -83,18 +95,24 @@ function MainPage({
         expenseDate={expenseDate}
         notes={notes}
         selectedCategory={selectedCategory}
+        selectedSubcategory={selectedSubcategory}
         selectedPaymentMethod={selectedPaymentMethod}
         newCategory={newCategory}
+        newSubcategory={newSubcategory}
         categories={categories}
+        subcategories={subcategories}
         editing={editingExpenseId !== null}
         onNameChange={onNameChange}
         onAmountChange={onAmountChange}
         onDateChange={onDateChange}
         onNotesChange={onNotesChange}
         onSelectedCategoryChange={onSelectedCategoryChange}
+        onSelectedSubcategoryChange={onSelectedSubcategoryChange}
         onSelectedPaymentMethodChange={onSelectedPaymentMethodChange}
         onNewCategoryChange={onNewCategoryChange}
+        onNewSubcategoryChange={onNewSubcategoryChange}
         onAddCategory={onAddCategory}
+        onAddSubcategory={onAddSubcategory}
         onSubmit={onSubmitExpense}
         onCancelEdit={onCancelEdit}
       />

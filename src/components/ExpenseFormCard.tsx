@@ -14,18 +14,24 @@ type ExpenseFormCardProps = {
   expenseDate: Date;
   notes: string;
   selectedCategory: string;
+  selectedSubcategory: string;
   selectedPaymentMethod: PaymentMethod;
   newCategory: string;
+  newSubcategory: string;
   categories: string[];
+  subcategories: string[];
   editing: boolean;
   onNameChange: (value: string) => void;
   onAmountChange: (value: string) => void;
   onDateChange: (value: Date) => void;
   onNotesChange: (value: string) => void;
   onSelectedCategoryChange: (value: string) => void;
+  onSelectedSubcategoryChange: (value: string) => void;
   onSelectedPaymentMethodChange: (value: PaymentMethod) => void;
   onNewCategoryChange: (value: string) => void;
+  onNewSubcategoryChange: (value: string) => void;
   onAddCategory: () => void;
+  onAddSubcategory: () => void;
   onSubmit: () => void;
   onCancelEdit: () => void;
 };
@@ -36,18 +42,24 @@ function ExpenseFormCard({
   expenseDate,
   notes,
   selectedCategory,
+  selectedSubcategory,
   selectedPaymentMethod,
   newCategory,
+  newSubcategory,
   categories,
+  subcategories,
   editing,
   onNameChange,
   onAmountChange,
   onDateChange,
   onNotesChange,
   onSelectedCategoryChange,
+  onSelectedSubcategoryChange,
   onSelectedPaymentMethodChange,
   onNewCategoryChange,
+  onNewSubcategoryChange,
   onAddCategory,
+  onAddSubcategory,
   onSubmit,
   onCancelEdit,
 }: ExpenseFormCardProps): React.JSX.Element {
@@ -121,6 +133,10 @@ function ExpenseFormCard({
           </TouchableOpacity>
         </View>
 
+      </View>
+
+      <View style={styles.compactFieldsRow}>
+
         <View style={styles.compactField}>
           <Text style={styles.label}>الفئة</Text>
           <View style={styles.pickerWrap}>
@@ -130,6 +146,27 @@ function ExpenseFormCard({
               onValueChange={itemValue => onSelectedCategoryChange(String(itemValue))}>
               {categories.map(cat => (
                 <Picker.Item key={cat} label={cat} value={cat} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
+        <View style={styles.compactField}>
+          <Text style={styles.label}>الفئة الفرعية</Text>
+          <View style={styles.pickerWrap}>
+            <Picker
+              style={styles.compactPicker}
+              selectedValue={selectedSubcategory}
+              onValueChange={itemValue =>
+                onSelectedSubcategoryChange(String(itemValue))
+              }>
+              <Picker.Item label="بدون فئة فرعية" value="" />
+              {subcategories.map(subcategory => (
+                <Picker.Item
+                  key={subcategory}
+                  label={subcategory}
+                  value={subcategory}
+                />
               ))}
             </Picker>
           </View>
@@ -175,6 +212,18 @@ function ExpenseFormCard({
         />
         <TouchableOpacity style={styles.secondaryBtn} onPress={onAddCategory}>
           <Text style={styles.btnText}>إضافة فئة</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.inlineRow}>
+        <TextInput
+          style={[styles.input, styles.flexInput]}
+          placeholder="إضافة فئة فرعية للفئة المحددة"
+          value={newSubcategory}
+          onChangeText={onNewSubcategoryChange}
+        />
+        <TouchableOpacity style={styles.secondaryBtn} onPress={onAddSubcategory}>
+          <Text style={styles.btnText}>إضافة فئة فرعية</Text>
         </TouchableOpacity>
       </View>
 

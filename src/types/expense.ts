@@ -6,6 +6,7 @@ export type Expense = {
   periodKey: string;
   notes: string;
   category: string;
+  subcategory: string;
   paymentMethod: PaymentMethod;
 };
 

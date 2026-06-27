@@ -17,7 +17,14 @@ type ExpensesTableCardProps = {
   onDelete: (expenseId: string) => void;
 };
 
-type SortKey = 'name' | 'amount' | 'dateISO' | 'category' | 'paymentMethod' | 'notes';
+type SortKey =
+  | 'name'
+  | 'amount'
+  | 'dateISO'
+  | 'category'
+  | 'subcategory'
+  | 'paymentMethod'
+  | 'notes';
 type SortDirection = 'asc' | 'desc';
 
 function ExpensesTableCard({
@@ -42,6 +49,8 @@ function ExpensesTableCard({
           return new Date(first.dateISO).getTime() - new Date(second.dateISO).getTime();
         case 'category':
           return first.category.localeCompare(second.category, 'ar');
+        case 'subcategory':
+          return (first.subcategory || '').localeCompare(second.subcategory || '', 'ar');
         case 'paymentMethod':
           return PAYMENT_METHOD_LABELS[first.paymentMethod].localeCompare(
             PAYMENT_METHOD_LABELS[second.paymentMethod],
@@ -100,6 +109,7 @@ function ExpensesTableCard({
         <Text style={[styles.cell, styles.categoryCell, {color: categoryColor}]}>
           {item.category}
         </Text>
+        <Text style={styles.cell}>{item.subcategory || '-'}</Text>
         <Text style={styles.cell}>{PAYMENT_METHOD_LABELS[item.paymentMethod]}</Text>
         <Text style={styles.cell}>{item.notes || '-'}</Text>
         <View style={[styles.cell, styles.actionsCell]}>
@@ -154,6 +164,13 @@ function ExpensesTableCard({
                 style={[styles.headerSortCell, styles.cell]}
                 onPress={() => toggleSort('category')}>
                 <Text style={styles.headerSortText}>الفئة {getSortArrow('category')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.headerSortCell, styles.cell]}
+                onPress={() => toggleSort('subcategory')}>
+                <Text style={styles.headerSortText}>
+                  الفئة الفرعية {getSortArrow('subcategory')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.headerSortCell, styles.cell]}

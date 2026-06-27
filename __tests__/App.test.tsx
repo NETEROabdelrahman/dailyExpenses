@@ -82,6 +82,7 @@ const mockState = {
     ],
     currentPeriodId: 'period_1',
     categories: ['طعام', 'ديون', 'مواصلات', 'تسوق', 'أخرى'],
+    subcategories: {},
     initialCashText: '',
     initialBankText: '',
     initialWalletText: '',
@@ -96,8 +97,10 @@ const mockState = {
       expenseDateISO: new Date().toISOString(),
       notes: '',
       selectedCategory: 'طعام',
+      selectedSubcategory: '',
       selectedPaymentMethod: 'cash',
       newCategory: '',
+      newSubcategory: '',
       editingExpenseId: null,
     },
     debtForm: {
@@ -146,6 +149,7 @@ jest.mock('../src/store/hooks', () => ({
 
 jest.mock('../src/store/appSlice', () => ({
   addCategoryFromForm: () => ({type: 'app/addCategoryFromForm'}),
+  addSubcategoryFromForm: () => ({type: 'app/addSubcategoryFromForm'}),
   addIncomingCustomSourceFromForm: () => ({type: 'app/addIncomingCustomSourceFromForm'}),
   deleteIncomingTransaction: (payload: string) => ({type: 'app/deleteIncomingTransaction', payload}),
   deleteDebt: (payload: string) => ({type: 'app/deleteDebt', payload}),
@@ -189,9 +193,11 @@ jest.mock('../src/store/appSlice', () => ({
   setInitialWalletText: (payload: string) => ({type: 'app/setInitialWalletText', payload}),
   setName: (payload: string) => ({type: 'app/setName', payload}),
   setNewCategory: (payload: string) => ({type: 'app/setNewCategory', payload}),
+  setNewSubcategory: (payload: string) => ({type: 'app/setNewSubcategory', payload}),
   setNotes: (payload: string) => ({type: 'app/setNotes', payload}),
   setPage: (payload: string) => ({type: 'app/setPage', payload}),
   setSelectedCategory: (payload: string) => ({type: 'app/setSelectedCategory', payload}),
+  setSelectedSubcategory: (payload: string) => ({type: 'app/setSelectedSubcategory', payload}),
   setSelectedPaymentMethod: (payload: string) => ({type: 'app/setSelectedPaymentMethod', payload}),
   startEditingExpense: (payload: unknown) => ({type: 'app/startEditingExpense', payload}),
 }));
