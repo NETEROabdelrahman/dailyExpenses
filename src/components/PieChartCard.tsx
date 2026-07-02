@@ -1,5 +1,5 @@
-import React from 'react';
-import {StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {StyleSheet, Text, TouchableOpacity, View} from 'react-native';
 import Svg, {G, Path} from 'react-native-svg';
 import {arc as d3Arc, pie as d3Pie, PieArcDatum} from 'd3-shape';
 import {PIE_CHART_SIZE} from '../constants/appConstants';
@@ -7,14 +7,50 @@ import {PieDatum} from '../types/expense';
 
 type PieChartCardProps = {
   data: PieDatum[];
+  drillDownData?: Record<string, PieDatum[]>;
 };
 
-function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
-  const total = data.reduce((sum, part) => sum + part.population, 0);
+function PieChartCard({data, drillDownData}: PieChartCardProps): React.JSX.Element {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const visibleData = selectedCategory
+    ? drillDownData?.[selectedCategory] ?? []
+    : data;
+  const total = visibleData.reduce((sum, part) => sum + part.population, 0);
+
+  useEffect(() => {
+    if (selectedCategory && !data.some(item => item.name === selectedCategory)) {
+      setSelectedCategory(null);
+    }
+  }, [data, selectedCategory]);
+
+  const openCategory = (category: string) => {
+    if (!selectedCategory && drillDownData?.[category]) {
+      setSelectedCategory(category);
+    }
+  };
 
   return (
     <View style={styles.card}>
-      {data.length > 0 ? (
+      <View style={styles.chartHeader}>
+        <Text style={styles.chartTitle}>
+          {selectedCategory
+            ? `الفئات الفرعية: ${selectedCategory}`
+            : 'المصروفات حسب الفئة'}
+        </Text>
+        {selectedCategory ? (
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setSelectedCategory(null)}>
+            <Text style={styles.backButtonText}>العودة للفئات</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {!selectedCategory && data.length > 0 && drillDownData ? (
+        <Text style={styles.drillDownHint}>اضغط على فئة لعرض فئاتها الفرعية</Text>
+      ) : null}
+
+      {visibleData.length > 0 ? (
         <>
           <View style={styles.pieCanvasWrap}>
             <Svg
@@ -26,7 +62,7 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
                   const pieGenerator = d3Pie<PieDatum>()
                     .value(item => item.population)
                     .sort(null);
-                  const slices = pieGenerator(data);
+                  const slices = pieGenerator(visibleData);
                   const radius = PIE_CHART_SIZE / 2;
                   const arcGenerator = d3Arc<PieArcDatum<PieDatum>>()
                     .innerRadius(0)
@@ -40,7 +76,11 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
 
                     return (
                       <G key={slice.data.name}>
-                        <Path d={path} fill={slice.data.color} />
+                        <Path
+                          d={path}
+                          fill={slice.data.color}
+                          onPress={() => openCategory(slice.data.name)}
+                        />
                       </G>
                     );
                   });
@@ -49,11 +89,17 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
             </Svg>
           </View>
           <View style={styles.pieLegendWrap}>
-            {data.map(item => {
+            {visibleData.map(item => {
               const percentage = total > 0 ? (item.population / total) * 100 : 0;
+              const canDrillDown =
+                !selectedCategory && Boolean(drillDownData?.[item.name]);
 
               return (
-                <View key={item.name} style={styles.pieLegendRow}>
+                <TouchableOpacity
+                  key={item.name}
+                  style={styles.pieLegendRow}
+                  disabled={!canDrillDown}
+                  onPress={() => openCategory(item.name)}>
                   <Text style={styles.pieLegendText}>
                     {percentage.toFixed(1)}% - {item.population.toFixed(2)} ج.م - {item.name}
                   </Text>
@@ -63,7 +109,7 @@ function PieChartCard({data}: PieChartCardProps): React.JSX.Element {
                       {backgroundColor: item.color},
                     ]}
                   />
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -86,6 +132,32 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 4},
     shadowRadius: 10,
     elevation: 2,
+  },
+  chartHeader: {
+    gap: 8,
+    alignItems: 'flex-end',
+  },
+  chartTitle: {
+    color: '#0f172a',
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  backButton: {
+    backgroundColor: '#7c3aed',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontWeight: '600',
+  },
+  drillDownHint: {
+    color: '#64748b',
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   pieCanvasWrap: {
     width: PIE_CHART_SIZE,

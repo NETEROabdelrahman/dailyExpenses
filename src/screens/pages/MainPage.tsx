@@ -32,6 +32,7 @@ type MainPageProps = {
   totalAllExpenses: number;
   expenses: Expense[];
   pieDataAll: PieDatum[];
+  pieDataAllBySubcategory: Record<string, PieDatum[]>;
   onEndCurrentMonth: () => void;
   onNameChange: (value: string) => void;
   onAmountChange: (value: string) => void;
@@ -70,6 +71,7 @@ function MainPage({
   totalAllExpenses,
   expenses,
   pieDataAll,
+  pieDataAllBySubcategory,
   onEndCurrentMonth,
   onNameChange,
   onAmountChange,
@@ -190,7 +192,10 @@ function MainPage({
         onEdit={onEditExpense}
         onDelete={onDeleteExpense}
       />
-      <PieChartCard data={pieDataAll} />
+      <PieChartCard
+        data={pieDataAll}
+        drillDownData={pieDataAllBySubcategory}
+      />
     </>
   );
 }

@@ -12,6 +12,7 @@ type MonthDetailsPageProps = {
   totalSelectedMonthExpenses: number;
   selectedMonthExpenses: Expense[];
   pieDataSelectedMonth: PieDatum[];
+  pieDataSelectedMonthBySubcategory: Record<string, PieDatum[]>;
   onBack: () => void;
   onSharePdf: () => void;
   onEditExpense: (expense: Expense) => void;
@@ -24,6 +25,7 @@ function MonthDetailsPage({
   totalSelectedMonthExpenses,
   selectedMonthExpenses,
   pieDataSelectedMonth,
+  pieDataSelectedMonthBySubcategory,
   onBack,
   onSharePdf,
   onEditExpense,
@@ -52,7 +54,11 @@ function MonthDetailsPage({
         onEdit={onEditExpense}
         onDelete={onDeleteExpense}
       />
-      <PieChartCard data={pieDataSelectedMonth} />
+      <PieChartCard
+        key={selectedMonth ?? 'no-month'}
+        data={pieDataSelectedMonth}
+        drillDownData={pieDataSelectedMonthBySubcategory}
+      />
     </>
   );
 }

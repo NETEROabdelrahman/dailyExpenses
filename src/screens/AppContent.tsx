@@ -82,6 +82,7 @@ import MonthDetailsPage from './pages/MonthDetailsPage';
 import MonthsPage from './pages/MonthsPage';
 
 const DEBT_PAYMENTS_CATEGORY = 'ديون';
+const NO_SUBCATEGORY_LABEL = 'بدون فئة فرعية';
 const getCategoryBreakdownKey = (category: string, subcategory = ''): string =>
   JSON.stringify([category, subcategory]);
 const parseCategoryBreakdownKey = (key: string): [string, string] => {
@@ -507,47 +508,92 @@ function AppContent(): React.JSX.Element {
     }
   }, [debtTransactionForm.selectedDebtId, dispatch, selectableDebts]);
 
-  const toPieData = (totals: Record<string, number>): PieDatum[] =>
-    Object.entries(totals).map(([key, total]) => {
-      const [category, subcategory] = parseCategoryBreakdownKey(key);
-      const displayName = subcategory ? `${category} / ${subcategory}` : category;
+  const toCategoryPieData = (totals: Record<string, number>): PieDatum[] => {
+    const categoryTotals = Object.entries(totals).reduce<Record<string, number>>(
+      (result, [key, total]) => {
+        const [category] = parseCategoryBreakdownKey(key);
+        result[category] = (result[category] ?? 0) + total;
+        return result;
+      },
+      {},
+    );
 
-      return {
-        name: displayName,
+    return Object.entries(categoryTotals)
+      .sort((first, second) => second[1] - first[1])
+      .map(([category, total]) => ({
+        name: category,
         population: total,
-        color: getCategoryColor(displayName),
-      };
-    });
+        color: getCategoryColor(category),
+      }));
+  };
 
-  const pieDataAll = useMemo(
-    () => toPieData(mergeCategoryTotals(totalsByCategoryAll, debtPaymentsTotalsByCategoryAll)),
+  const toSubcategoryPieData = (
+    totals: Record<string, number>,
+  ): Record<string, PieDatum[]> => {
+    const totalsByCategory = Object.entries(totals).reduce<
+      Record<string, Record<string, number>>
+    >((result, [key, total]) => {
+      const [category, subcategory] = parseCategoryBreakdownKey(key);
+      const displayName = subcategory || NO_SUBCATEGORY_LABEL;
+      const categoryTotals = result[category] ?? {};
+      categoryTotals[displayName] = (categoryTotals[displayName] ?? 0) + total;
+      result[category] = categoryTotals;
+      return result;
+    }, {});
+
+    return Object.fromEntries(
+      Object.entries(totalsByCategory).map(([category, categoryTotals]) => [
+        category,
+        Object.entries(categoryTotals)
+          .sort((first, second) => second[1] - first[1])
+          .map(([subcategory, total]) => ({
+            name: subcategory,
+            population: total,
+            color: getCategoryColor(`${category} / ${subcategory}`),
+          })),
+      ]),
+    );
+  };
+
+  const categoryBreakdownAll = useMemo(
+    () => mergeCategoryTotals(totalsByCategoryAll, debtPaymentsTotalsByCategoryAll),
     [debtPaymentsTotalsByCategoryAll, totalsByCategoryAll],
   );
-  const pieDataSelectedMonth = useMemo(
+  const categoryBreakdownSelectedMonth = useMemo(
     () =>
-      toPieData(
-        mergeCategoryTotals(
-          totalsByCategorySelectedMonth,
-          debtPaymentsTotalsByCategorySelectedMonth,
-        ),
+      mergeCategoryTotals(
+        totalsByCategorySelectedMonth,
+        debtPaymentsTotalsByCategorySelectedMonth,
       ),
     [debtPaymentsTotalsByCategorySelectedMonth, totalsByCategorySelectedMonth],
   );
 
+  const pieDataAll = useMemo(
+    () => toCategoryPieData(categoryBreakdownAll),
+    [categoryBreakdownAll],
+  );
+  const pieDataAllBySubcategory = useMemo(
+    () => toSubcategoryPieData(categoryBreakdownAll),
+    [categoryBreakdownAll],
+  );
+  const pieDataSelectedMonth = useMemo(
+    () => toCategoryPieData(categoryBreakdownSelectedMonth),
+    [categoryBreakdownSelectedMonth],
+  );
+  const pieDataSelectedMonthBySubcategory = useMemo(
+    () => toSubcategoryPieData(categoryBreakdownSelectedMonth),
+    [categoryBreakdownSelectedMonth],
+  );
+
   const selectedMonthCategoryTotals = useMemo(
     () =>
-      Object.entries(
-        mergeCategoryTotals(
-          totalsByCategorySelectedMonth,
-          debtPaymentsTotalsByCategorySelectedMonth,
-        ),
-      )
+      Object.entries(categoryBreakdownSelectedMonth)
         .map(([key, total]) => {
           const [category, subcategory] = parseCategoryBreakdownKey(key);
           return {category, subcategory, total};
         })
         .sort((first, second) => second.total - first.total),
-    [debtPaymentsTotalsByCategorySelectedMonth, totalsByCategorySelectedMonth],
+    [categoryBreakdownSelectedMonth],
   );
 
   const shareSelectedMonthPdf = async () => {
@@ -956,6 +1002,7 @@ function AppContent(): React.JSX.Element {
                 totalAllExpenses={totalAllExpenses}
                 expenses={currentPeriodExpenses}
                 pieDataAll={pieDataAll}
+                pieDataAllBySubcategory={pieDataAllBySubcategory}
                 onEndCurrentMonth={confirmEndCurrentMonth}
                 onNameChange={value => dispatch(setName(value))}
                 onAmountChange={value => dispatch(setAmountText(value))}
@@ -1077,6 +1124,9 @@ function AppContent(): React.JSX.Element {
                 totalSelectedMonthExpenses={totalSelectedMonthExpenses}
                 selectedMonthExpenses={selectedMonthExpenses}
                 pieDataSelectedMonth={pieDataSelectedMonth}
+                pieDataSelectedMonthBySubcategory={
+                  pieDataSelectedMonthBySubcategory
+                }
                 onBack={() => dispatch(setPage('months'))}
                 onSharePdf={shareSelectedMonthPdf}
                 onEditExpense={expense => dispatch(startEditingExpense(expense))}
